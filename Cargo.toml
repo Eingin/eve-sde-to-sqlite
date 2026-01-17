@@ -1,0 +1,23 @@
+[package]
+name = "eve-sde-to-sqlite"
+version = "0.1.0"
+edition = "2021"
+description = "Convert EVE Online SDE JSONL files to SQLite database"
+license = "MIT"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+rayon = "1.10"
+indicatif = { version = "0.17", features = ["rayon"] }
+anyhow = "1"
+crossbeam-channel = "0.5"
+reqwest = { version = "0.12", features = ["blocking", "stream"] }
+zip = "2"
+tempfile = "3"
+directories = "5"
+
+[dev-dependencies]
+tempfile = "3"
