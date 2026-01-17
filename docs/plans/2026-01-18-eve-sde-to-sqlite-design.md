@@ -8,6 +8,7 @@ A Rust CLI tool that downloads and converts EVE Online Static Data Export (SDE) 
 
 - Download latest SDE zip from EVE API endpoint (or use local directory)
 - Convert all 55 JSONL files to normalized SQLite tables
+- **Filter tables via `--include` or `--exclude` flags for slimmer databases**
 - Localized text stored as separate columns per language (`name_en`, `name_de`, etc.)
 - Nested arrays normalized into separate junction/child tables
 - Foreign key constraints enforced for referential integrity
@@ -128,9 +129,18 @@ ARGS:
     <OUTPUT_DB>    Output SQLite database path
 
 OPTIONS:
-    -f, --force         Force re-download even if cached
-    -c, --cache-dir     Custom cache directory (default: ~/.cache/eve-sde-to-sqlite)
-    -h, --help          Print help
+    -i, --include <TABLES>  Only include these tables (comma-separated)
+    -e, --exclude <TABLES>  Exclude these tables (comma-separated)
+    -f, --force             Force re-download even if cached
+    -c, --cache-dir         Custom cache directory (default: ~/.cache/eve-sde-to-sqlite)
+    -h, --help              Print help
+
+EXAMPLES:
+    # Only include specific tables (dependencies auto-included)
+    eve-sde-to-sqlite sync eve.db --include types,blueprints,groups
+
+    # Exclude large map tables for smaller database
+    eve-sde-to-sqlite sync eve.db --exclude mapMoons,mapPlanets,mapAsteroidBelts
 ```
 
 ### Subcommand: download
@@ -158,7 +168,23 @@ ARGS:
     <OUTPUT_DB>    Output SQLite database path
 
 OPTIONS:
-    -h, --help     Print help
+    -i, --include <TABLES>  Only include these tables (comma-separated)
+    -e, --exclude <TABLES>  Exclude these tables (comma-separated)
+    -h, --help              Print help
+```
+
+### Subcommand: list-tables
+
+```
+eve-sde-to-sqlite list-tables
+
+Lists all available tables that can be used with --include/--exclude.
+
+OUTPUT:
+    categories
+    groups
+    types
+    ...
 ```
 
 ## Download Flow
@@ -276,6 +302,85 @@ CREATE TABLE types (
 );
 ```
 
+## Table Filtering
+
+### Include/Exclude Logic
+
+The CLI supports `--include` and `--exclude` flags to filter which tables are converted:
+
+```bash
+# Only convert types and blueprints (plus their FK dependencies)
+eve-sde-to-sqlite sync eve.db --include types,blueprints
+
+# Convert everything except large map tables
+eve-sde-to-sqlite sync eve.db --exclude mapMoons,mapPlanets,mapAsteroidBelts
+```
+
+**Rules:**
+- `--include` and `--exclude` are mutually exclusive
+- Table names use snake_case (matching SQLite table names)
+- Child/junction tables are automatically included with their parent
+
+### Automatic Dependency Resolution
+
+When using `--include`, the tool automatically includes FK parent tables:
+
+```
+User requests: --include types
+
+Dependency chain:
+  types → groups → categories
+
+Auto-included tables:
+  ✓ types
+  ✓ groups (FK parent of types)
+  ✓ categories (FK parent of groups)
+```
+
+**Example expansion:**
+
+| User Request | Auto-Included Dependencies | Final Tables |
+|--------------|---------------------------|--------------|
+| `--include types` | groups, categories | types, groups, categories |
+| `--include blueprints` | types, groups, categories | blueprints, blueprint_*, types, groups, categories |
+| `--include map_solar_systems` | map_constellations, map_regions | map_solar_systems, map_constellations, map_regions |
+
+### Filter Resolution Flow
+
+```
+1. Parse --include or --exclude list
+2. If --include:
+   a. Start with requested tables
+   b. For each table, traverse FK dependencies
+   c. Add all parent tables recursively
+   d. Include child/junction tables of included parents
+3. If --exclude:
+   a. Start with all tables
+   b. Remove excluded tables
+   c. Remove orphaned child tables (parent excluded)
+4. Validate no FK violations in final set
+5. Print resolved table list before processing
+```
+
+### Output on Filtered Run
+
+```
+$ eve-sde-to-sqlite sync eve.db --include types,blueprints
+
+Resolving dependencies...
+  Requested: types, blueprints
+  Auto-included: groups, categories (FK dependencies)
+  Child tables: type_dogma_attributes, type_materials, blueprint_materials, ...
+
+Converting 12 tables (excluded 43):
+  categories         [========] 47/47
+  groups             [========] 1,892/1,892
+  types              [========] 51,134/51,134
+  ...
+
+Created eve.db (12 tables, 142,847 records) in 1.2s
+```
+
 ## Processing Flow
 
 ### Parallel Processing with Dependency Waves
@@ -351,10 +456,11 @@ eve-sde-to-sqlite/
 │   │   ├── cache.rs         # Cache directory management
 │   │   └── extract.rs       # Zip extraction
 │   ├── discovery.rs         # Scan dir, count lines, build dep graph
+│   ├── filter.rs            # Table filtering (--include/--exclude)
 │   ├── schema/
 │   │   ├── mod.rs           # Schema registry, table definitions
 │   │   ├── tables.rs        # Individual table schemas
-│   │   └── dependencies.rs  # Dependency graph, wave ordering
+│   │   └── dependencies.rs  # Dependency graph, wave ordering, FK resolution
 │   ├── parser/
 │   │   ├── mod.rs           # JSONL parsing traits
 │   │   ├── localized.rs     # Handle localized text extraction
