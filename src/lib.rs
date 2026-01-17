@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod download;
 pub mod filter;
+pub mod parser;
 pub mod schema;
 pub mod writer;
 
