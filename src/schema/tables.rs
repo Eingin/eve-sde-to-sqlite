@@ -16,6 +16,7 @@ pub static CATEGORIES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static DOGMA_ATTRIBUTE_CATEGORIES: TableSchema = TableSchema {
@@ -28,6 +29,7 @@ pub static DOGMA_ATTRIBUTE_CATEGORIES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static DOGMA_UNITS: TableSchema = TableSchema {
@@ -41,6 +43,7 @@ pub static DOGMA_UNITS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static ICONS: TableSchema = TableSchema {
@@ -53,6 +56,7 @@ pub static ICONS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static GRAPHICS: TableSchema = TableSchema {
@@ -68,6 +72,7 @@ pub static GRAPHICS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static AGENT_TYPES: TableSchema = TableSchema {
@@ -79,6 +84,7 @@ pub static AGENT_TYPES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static STATION_SERVICES: TableSchema = TableSchema {
@@ -90,6 +96,7 @@ pub static STATION_SERVICES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static CORPORATION_ACTIVITIES: TableSchema = TableSchema {
@@ -101,6 +108,7 @@ pub static CORPORATION_ACTIVITIES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static META_GROUPS: TableSchema = TableSchema {
@@ -115,6 +123,7 @@ pub static META_GROUPS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static CHARACTER_ATTRIBUTES: TableSchema = TableSchema {
@@ -130,6 +139,7 @@ pub static CHARACTER_ATTRIBUTES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static TRANSLATION_LANGUAGES: TableSchema = TableSchema {
@@ -141,6 +151,7 @@ pub static TRANSLATION_LANGUAGES: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static SKIN_MATERIALS: TableSchema = TableSchema {
@@ -153,6 +164,7 @@ pub static SKIN_MATERIALS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 // =============================================================================
@@ -169,10 +181,9 @@ pub static RACES: TableSchema = TableSchema {
         Column::new("icon_id", ColumnType::Integer),
         Column::new("ship_type_id", ColumnType::Integer),
     ],
-    foreign_keys: &[
-        ForeignKey::new("icon_id", "icons"),
-    ],
+    foreign_keys: &[ForeignKey::new("icon_id", "icons")],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static GROUPS: TableSchema = TableSchema {
@@ -194,6 +205,7 @@ pub static GROUPS: TableSchema = TableSchema {
         ForeignKey::new("icon_id", "icons"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static DOGMA_ATTRIBUTES: TableSchema = TableSchema {
@@ -222,6 +234,7 @@ pub static DOGMA_ATTRIBUTES: TableSchema = TableSchema {
         ForeignKey::new("unit_id", "dogma_units"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static DOGMA_EFFECTS: TableSchema = TableSchema {
@@ -253,10 +266,9 @@ pub static DOGMA_EFFECTS: TableSchema = TableSchema {
         Column::new("fitting_usage_chance_attribute_id", ColumnType::Integer),
         Column::new("resistance_attribute_id", ColumnType::Integer),
     ],
-    foreign_keys: &[
-        ForeignKey::new("icon_id", "icons"),
-    ],
+    foreign_keys: &[ForeignKey::new("icon_id", "icons")],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_REGIONS: TableSchema = TableSchema {
@@ -283,6 +295,7 @@ pub static MAP_REGIONS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MARKET_GROUPS: TableSchema = TableSchema {
@@ -301,6 +314,7 @@ pub static MARKET_GROUPS: TableSchema = TableSchema {
         ForeignKey::new("parent_group_id", "market_groups"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static STATION_OPERATIONS: TableSchema = TableSchema {
@@ -321,6 +335,7 @@ pub static STATION_OPERATIONS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static SKINS: TableSchema = TableSchema {
@@ -334,10 +349,9 @@ pub static SKINS: TableSchema = TableSchema {
         Column::new("visible_serenity", ColumnType::Boolean),
         Column::new("visible_tranquility", ColumnType::Boolean),
     ],
-    foreign_keys: &[
-        ForeignKey::new("skin_material_id", "skin_materials"),
-    ],
+    foreign_keys: &[ForeignKey::new("skin_material_id", "skin_materials")],
     child_tables: &[],
+    array_source: None,
 };
 
 // =============================================================================
@@ -365,6 +379,7 @@ pub static BLOODLINES: TableSchema = TableSchema {
         ForeignKey::new("icon_id", "icons"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static FACTIONS: TableSchema = TableSchema {
@@ -382,10 +397,9 @@ pub static FACTIONS: TableSchema = TableSchema {
         Column::new("size_factor", ColumnType::Real),
         Column::new("unique_name", ColumnType::Boolean),
     ],
-    foreign_keys: &[
-        ForeignKey::new("icon_id", "icons"),
-    ],
+    foreign_keys: &[ForeignKey::new("icon_id", "icons")],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static NPC_CORPORATIONS: TableSchema = TableSchema {
@@ -413,6 +427,7 @@ pub static NPC_CORPORATIONS: TableSchema = TableSchema {
     ],
     foreign_keys: &[],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_CONSTELLATIONS: TableSchema = TableSchema {
@@ -434,10 +449,9 @@ pub static MAP_CONSTELLATIONS: TableSchema = TableSchema {
         Column::new("min_z", ColumnType::Real),
         Column::new("radius", ColumnType::Real),
     ],
-    foreign_keys: &[
-        ForeignKey::new("region_id", "map_regions"),
-    ],
+    foreign_keys: &[ForeignKey::new("region_id", "map_regions")],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static TYPES: TableSchema = TableSchema {
@@ -475,6 +489,7 @@ pub static TYPES: TableSchema = TableSchema {
         ForeignKey::new("race_id", "races"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 // =============================================================================
@@ -502,6 +517,7 @@ pub static ANCESTRIES: TableSchema = TableSchema {
         ForeignKey::new("icon_id", "icons"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_SOLAR_SYSTEMS: TableSchema = TableSchema {
@@ -532,6 +548,7 @@ pub static MAP_SOLAR_SYSTEMS: TableSchema = TableSchema {
         ForeignKey::new("region_id", "map_regions"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static BLUEPRINTS: TableSchema = TableSchema {
@@ -548,10 +565,13 @@ pub static BLUEPRINTS: TableSchema = TableSchema {
         Column::new("invention_time", ColumnType::Integer),
         Column::new("reaction_time", ColumnType::Integer),
     ],
-    foreign_keys: &[
-        ForeignKey::new("blueprint_type_id", "types"),
+    foreign_keys: &[ForeignKey::new("blueprint_type_id", "types")],
+    child_tables: &[
+        "blueprint_materials",
+        "blueprint_products",
+        "blueprint_skills",
     ],
-    child_tables: &["blueprint_materials", "blueprint_products", "blueprint_skills"],
+    array_source: None,
 };
 
 pub static SKIN_LICENSES: TableSchema = TableSchema {
@@ -568,6 +588,7 @@ pub static SKIN_LICENSES: TableSchema = TableSchema {
         ForeignKey::new("skin_id", "skins"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static CERTIFICATES: TableSchema = TableSchema {
@@ -579,10 +600,9 @@ pub static CERTIFICATES: TableSchema = TableSchema {
         Column::new("description", ColumnType::Localized),
         Column::new("group_id", ColumnType::Integer),
     ],
-    foreign_keys: &[
-        ForeignKey::new("group_id", "groups"),
-    ],
+    foreign_keys: &[ForeignKey::new("group_id", "groups")],
     child_tables: &[],
+    array_source: None,
 };
 
 // =============================================================================
@@ -609,6 +629,7 @@ pub static MAP_STARS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_PLANETS: TableSchema = TableSchema {
@@ -632,6 +653,7 @@ pub static MAP_PLANETS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_MOONS: TableSchema = TableSchema {
@@ -656,6 +678,7 @@ pub static MAP_MOONS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_ASTEROID_BELTS: TableSchema = TableSchema {
@@ -679,6 +702,7 @@ pub static MAP_ASTEROID_BELTS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static MAP_STARGATES: TableSchema = TableSchema {
@@ -700,6 +724,7 @@ pub static MAP_STARGATES: TableSchema = TableSchema {
         ForeignKey::new("destination_solar_system_id", "map_solar_systems"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 pub static NPC_STATIONS: TableSchema = TableSchema {
@@ -729,6 +754,7 @@ pub static NPC_STATIONS: TableSchema = TableSchema {
         ForeignKey::new("operation_id", "station_operations"),
     ],
     child_tables: &[],
+    array_source: None,
 };
 
 // =============================================================================
@@ -748,6 +774,10 @@ pub static TYPE_DOGMA_ATTRIBUTES: TableSchema = TableSchema {
         ForeignKey::new("attribute_id", "dogma_attributes"),
     ],
     child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "dogmaAttributes",
+        parent_id_column: "type_id",
+    }),
 };
 
 pub static TYPE_MATERIALS: TableSchema = TableSchema {
@@ -763,6 +793,10 @@ pub static TYPE_MATERIALS: TableSchema = TableSchema {
         ForeignKey::new("material_type_id", "types"),
     ],
     child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "materials",
+        parent_id_column: "type_id",
+    }),
 };
 
 pub static BLUEPRINT_MATERIALS: TableSchema = TableSchema {
@@ -779,6 +813,10 @@ pub static BLUEPRINT_MATERIALS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: Some(ArraySource::BlueprintActivity {
+        activity_column: "activity",
+        array_field: "materials",
+    }),
 };
 
 pub static BLUEPRINT_PRODUCTS: TableSchema = TableSchema {
@@ -796,6 +834,10 @@ pub static BLUEPRINT_PRODUCTS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: Some(ArraySource::BlueprintActivity {
+        activity_column: "activity",
+        array_field: "products",
+    }),
 };
 
 pub static BLUEPRINT_SKILLS: TableSchema = TableSchema {
@@ -812,6 +854,10 @@ pub static BLUEPRINT_SKILLS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
     ],
     child_tables: &[],
+    array_source: Some(ArraySource::BlueprintActivity {
+        activity_column: "activity",
+        array_field: "skills",
+    }),
 };
 
 // =============================================================================
@@ -861,7 +907,7 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &MAP_ASTEROID_BELTS,
     &MAP_STARGATES,
     &NPC_STATIONS,
-    // Junction tables
+    // Wave 6: Junction tables (from nested arrays)
     &TYPE_DOGMA_ATTRIBUTES,
     &TYPE_MATERIALS,
     &BLUEPRINT_MATERIALS,

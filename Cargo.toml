@@ -2,22 +2,24 @@
 name = "eve-sde-to-sqlite"
 version = "0.1.0"
 edition = "2021"
-description = "Convert EVE Online SDE JSONL files to SQLite database"
+description = "Convert EVE Online Static Data Export (SDE) to SQLite database"
 license = "MIT"
+repository = "https://github.com/yourusername/eve-sde-to-sqlite"
+keywords = ["eve-online", "sqlite", "sde", "game-data"]
+categories = ["command-line-utilities", "database"]
 
 [dependencies]
+anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+directories = "5"
+indicatif = "0.17"
+reqwest = { version = "0.12", features = ["blocking"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rusqlite = { version = "0.31", features = ["bundled"] }
-rayon = "1.10"
-indicatif = { version = "0.17", features = ["rayon"] }
-anyhow = "1"
-crossbeam-channel = "0.5"
-reqwest = { version = "0.12", features = ["blocking", "stream"] }
 zip = "2"
-tempfile = "3"
-directories = "5"
 
 [dev-dependencies]
+once_cell = "1.19"
+rand = "0.8"
 tempfile = "3"

@@ -1,12 +1,13 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use super::tables::{ALL_TABLES, get_table};
+use super::tables::{get_table, ALL_TABLES};
 use super::types::TableSchema;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Resolves table dependencies for filtering
 pub struct DependencyResolver {
     /// Map of table name -> tables it depends on
     deps: HashMap<&'static str, HashSet<&'static str>>,
-    /// Map of table name -> tables that depend on it
+    /// Map of table name -> tables that depend on it (reserved for future use)
+    #[allow(dead_code)]
     reverse_deps: HashMap<&'static str, HashSet<&'static str>>,
 }
 
@@ -18,12 +19,9 @@ impl DependencyResolver {
         for table in ALL_TABLES {
             let table_deps = table.dependencies();
             deps.insert(table.name, table_deps.clone());
-            
+
             for dep in table_deps {
-                reverse_deps
-                    .entry(dep)
-                    .or_default()
-                    .insert(table.name);
+                reverse_deps.entry(dep).or_default().insert(table.name);
             }
         }
 
@@ -32,7 +30,10 @@ impl DependencyResolver {
 
     /// Given a set of requested tables, resolve all required dependencies
     /// Returns tables in dependency order (parents before children)
-    pub fn resolve_includes(&self, requested: &[&str]) -> Result<Vec<&'static TableSchema>, String> {
+    pub fn resolve_includes(
+        &self,
+        requested: &[&str],
+    ) -> Result<Vec<&'static TableSchema>, String> {
         let mut included: HashSet<&str> = HashSet::new();
         let mut queue: VecDeque<&str> = requested.iter().copied().collect();
 
@@ -87,10 +88,11 @@ impl DependencyResolver {
         for table in ALL_TABLES {
             if !excluded_set.contains(table.name) {
                 // Check if parent is excluded - if so, skip this table too
-                let parent_excluded = table.foreign_keys
+                let parent_excluded = table
+                    .foreign_keys
                     .iter()
                     .any(|fk| excluded_set.contains(fk.references_table));
-                
+
                 if !parent_excluded {
                     included.insert(table.name);
                 }
@@ -106,14 +108,23 @@ impl DependencyResolver {
     }
 
     /// Topological sort of tables by dependencies
-    fn topological_sort(&self, included: &HashSet<&str>) -> Result<Vec<&'static TableSchema>, String> {
+    fn topological_sort(
+        &self,
+        included: &HashSet<&str>,
+    ) -> Result<Vec<&'static TableSchema>, String> {
         let mut result = Vec::new();
         let mut visited: HashSet<&str> = HashSet::new();
         let mut temp_visited: HashSet<&str> = HashSet::new();
 
         for table_name in included {
             if !visited.contains(table_name) {
-                self.visit(table_name, included, &mut visited, &mut temp_visited, &mut result)?;
+                self.visit(
+                    table_name,
+                    included,
+                    &mut visited,
+                    &mut temp_visited,
+                    &mut result,
+                )?;
             }
         }
 
@@ -172,16 +183,16 @@ mod tests {
         let resolver = DependencyResolver::new();
         let tables = resolver.resolve_includes(&["types"]).unwrap();
         let names: Vec<_> = tables.iter().map(|t| t.name).collect();
-        
+
         assert!(names.contains(&"types"));
         assert!(names.contains(&"groups"));
         assert!(names.contains(&"categories"));
-        
+
         // Parents should come before children
         let types_pos = names.iter().position(|&n| n == "types").unwrap();
         let groups_pos = names.iter().position(|&n| n == "groups").unwrap();
         let categories_pos = names.iter().position(|&n| n == "categories").unwrap();
-        
+
         assert!(categories_pos < groups_pos);
         assert!(groups_pos < types_pos);
     }

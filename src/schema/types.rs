@@ -26,11 +26,19 @@ pub struct Column {
 
 impl Column {
     pub const fn new(name: &'static str, col_type: ColumnType) -> Self {
-        Self { name, col_type, nullable: true }
+        Self {
+            name,
+            col_type,
+            nullable: true,
+        }
     }
 
     pub const fn required(name: &'static str, col_type: ColumnType) -> Self {
-        Self { name, col_type, nullable: false }
+        Self {
+            name,
+            col_type,
+            nullable: false,
+        }
     }
 }
 
@@ -52,6 +60,25 @@ impl ForeignKey {
     }
 }
 
+/// Describes how to extract rows from nested arrays in JSONL
+#[derive(Debug, Clone)]
+pub enum ArraySource {
+    /// Simple nested array: `{"_key": X, "fieldName": [{...}, {...}]}`
+    Simple {
+        /// JSON field containing the array (e.g., "dogmaAttributes")
+        array_field: &'static str,
+        /// Column to store the parent's _key value (e.g., "type_id")
+        parent_id_column: &'static str,
+    },
+    /// Blueprint activities: `activities.{activity}.{field}[]`
+    BlueprintActivity {
+        /// Column to store the activity name (e.g., "activity")
+        activity_column: &'static str,
+        /// Array field within each activity (e.g., "materials")
+        array_field: &'static str,
+    },
+}
+
 /// Table schema definition
 #[derive(Debug, Clone)]
 pub struct TableSchema {
@@ -61,6 +88,8 @@ pub struct TableSchema {
     pub foreign_keys: &'static [ForeignKey],
     /// Child tables derived from nested arrays
     pub child_tables: &'static [&'static str],
+    /// For junction tables: how to extract rows from nested arrays
+    pub array_source: Option<ArraySource>,
 }
 
 impl TableSchema {

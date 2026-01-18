@@ -7,25 +7,25 @@ use zip::ZipArchive;
 
 /// Extract a zip file to the destination directory
 pub fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
-    let file = File::open(zip_path)
-        .context("Failed to open zip file")?;
+    let file = File::open(zip_path).context("Failed to open zip file")?;
     let reader = BufReader::new(file);
-    let mut archive = ZipArchive::new(reader)
-        .context("Failed to read zip archive")?;
+    let mut archive = ZipArchive::new(reader).context("Failed to read zip archive")?;
 
-    fs::create_dir_all(dest_dir)
-        .context("Failed to create destination directory")?;
+    fs::create_dir_all(dest_dir).context("Failed to create destination directory")?;
 
     let total_files = archive.len();
     let pb = ProgressBar::new(total_files as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{msg} [{bar:40.cyan/blue}] {pos}/{len} files")
-        .unwrap()
-        .progress_chars("=>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{msg} [{bar:40.cyan/blue}] {pos}/{len} files")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
     pb.set_message("Extracting");
 
     for i in 0..total_files {
-        let mut file = archive.by_index(i)
+        let mut file = archive
+            .by_index(i)
             .context("Failed to read file from archive")?;
 
         // Get the file name, stripping any directory prefix

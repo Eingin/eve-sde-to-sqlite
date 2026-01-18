@@ -16,21 +16,21 @@ pub fn resolve_tables(
             let refs: Vec<&str> = include_list.iter().map(|s| s.as_str()).collect();
             println!("Resolving dependencies for: {:?}", refs);
             let tables = resolver.resolve_includes(&refs).map_err(|e| anyhow!(e))?;
-            
+
             println!("Including {} tables:", tables.len());
             for t in &tables {
                 println!("  - {}", t.name);
             }
-            
+
             Ok(tables)
         }
         (None, Some(exclude_list)) => {
             let refs: Vec<&str> = exclude_list.iter().map(|s| s.as_str()).collect();
             println!("Excluding tables: {:?}", refs);
             let tables = resolver.resolve_excludes(&refs).map_err(|e| anyhow!(e))?;
-            
+
             println!("Including {} tables (after exclusions):", tables.len());
-            
+
             Ok(tables)
         }
         (None, None) => {

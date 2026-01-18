@@ -5,9 +5,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use crate::parser::{parse_record, ParsedRow};
-use crate::schema::{ColumnType, TableSchema, LANGUAGES};
 use super::schema_gen::{generate_create_table, generate_indexes};
+use crate::parser::{parse_junction_records, parse_record, ParsedRow};
+use crate::schema::{ColumnType, TableSchema, LANGUAGES};
 
 const BATCH_SIZE: usize = 1000;
 
@@ -19,19 +19,17 @@ impl SqliteWriter {
     pub fn new(db_path: &Path) -> Result<Self> {
         // Remove existing database if present
         if db_path.exists() {
-            std::fs::remove_file(db_path)
-                .context("Failed to remove existing database")?;
+            std::fs::remove_file(db_path).context("Failed to remove existing database")?;
         }
 
-        let conn = Connection::open(db_path)
-            .context("Failed to create database")?;
+        let conn = Connection::open(db_path).context("Failed to create database")?;
 
-        // Enable foreign keys and optimize for bulk insert
+        // Optimize for bulk insert - defer FK checks until finalize
         conn.execute_batch(
-            "PRAGMA foreign_keys = ON;
+            "PRAGMA foreign_keys = OFF;
              PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             PRAGMA cache_size = -64000;"
+             PRAGMA cache_size = -64000;",
         )?;
 
         Ok(Self { conn })
@@ -40,14 +38,16 @@ impl SqliteWriter {
     /// Create all tables for the given schemas
     pub fn create_tables(&self, schemas: &[&TableSchema]) -> Result<()> {
         println!("Creating {} tables...", schemas.len());
-        
+
         for schema in schemas {
             let sql = generate_create_table(schema);
-            self.conn.execute(&sql, [])
+            self.conn
+                .execute(&sql, [])
                 .with_context(|| format!("Failed to create table: {}", schema.name))?;
 
             for index_sql in generate_indexes(schema) {
-                self.conn.execute(&index_sql, [])
+                self.conn
+                    .execute(&index_sql, [])
                     .with_context(|| format!("Failed to create index for: {}", schema.name))?;
             }
         }
@@ -63,14 +63,14 @@ impl SqliteWriter {
         progress: &ProgressBar,
     ) -> Result<u64> {
         let file_path = input_dir.join(schema.source_file);
-        
+
         if !file_path.exists() {
             progress.finish_with_message(format!("{}: skipped (file not found)", schema.name));
             return Ok(0);
         }
 
-        let file = File::open(&file_path)
-            .with_context(|| format!("Failed to open: {:?}", file_path))?;
+        let file =
+            File::open(&file_path).with_context(|| format!("Failed to open: {:?}", file_path))?;
         let reader = BufReader::new(file);
 
         // Build insert statement
@@ -87,22 +87,43 @@ impl SqliteWriter {
         let mut count: u64 = 0;
         let mut batch: Vec<ParsedRow> = Vec::with_capacity(BATCH_SIZE);
 
+        let is_junction = schema.array_source.is_some();
+
         for line in reader.lines() {
             let line = line.context("Failed to read line")?;
             if line.trim().is_empty() {
                 continue;
             }
 
-            let row = parse_record(&line, schema)
-                .with_context(|| format!("Failed to parse record in {}", schema.source_file))?;
-            
-            batch.push(row);
+            if is_junction {
+                // Junction table: one JSON line produces multiple rows
+                let rows = parse_junction_records(&line, schema).with_context(|| {
+                    format!("Failed to parse junction record in {}", schema.source_file)
+                })?;
 
-            if batch.len() >= BATCH_SIZE {
-                insert_batch(&tx, &insert_sql, &columns, &batch)?;
-                count += batch.len() as u64;
-                progress.set_position(count);
-                batch.clear();
+                for row in rows {
+                    batch.push(row);
+
+                    if batch.len() >= BATCH_SIZE {
+                        insert_batch(&tx, &insert_sql, &columns, &batch)?;
+                        count += batch.len() as u64;
+                        progress.set_position(count);
+                        batch.clear();
+                    }
+                }
+            } else {
+                // Regular table: one JSON line = one row
+                let row = parse_record(&line, schema)
+                    .with_context(|| format!("Failed to parse record in {}", schema.source_file))?;
+
+                batch.push(row);
+
+                if batch.len() >= BATCH_SIZE {
+                    insert_batch(&tx, &insert_sql, &columns, &batch)?;
+                    count += batch.len() as u64;
+                    progress.set_position(count);
+                    batch.clear();
+                }
             }
         }
 
@@ -119,10 +140,14 @@ impl SqliteWriter {
         Ok(count)
     }
 
-    /// Finalize the database (VACUUM, etc.)
+    /// Finalize the database (enable FKs, optimize, etc.)
     pub fn finalize(self) -> Result<()> {
         println!("Finalizing database...");
+
+        // Enable foreign keys for future use
+        self.conn.execute("PRAGMA foreign_keys = ON;", [])?;
         self.conn.execute("PRAGMA optimize;", [])?;
+
         Ok(())
     }
 }
@@ -130,7 +155,7 @@ impl SqliteWriter {
 /// Get column names for a schema, expanding localized columns
 fn get_column_names(schema: &TableSchema) -> Vec<String> {
     let mut columns = Vec::new();
-    
+
     for col in schema.columns {
         match col.col_type {
             ColumnType::Localized => {
@@ -158,7 +183,9 @@ fn insert_batch(
 
     for row in batch {
         for (idx, col_name) in columns.iter().enumerate() {
-            let value = row.values.get(col_name)
+            let value = row
+                .values
+                .get(col_name)
                 .cloned()
                 .unwrap_or(crate::parser::SqlValue::Null);
             value.bind_to(idx + 1, &mut stmt)?;
@@ -176,7 +203,7 @@ pub fn convert_to_sqlite(
     tables: Vec<&TableSchema>,
 ) -> Result<u64> {
     let mut writer = SqliteWriter::new(output_db)?;
-    
+
     // Create all tables first
     writer.create_tables(&tables)?;
 
