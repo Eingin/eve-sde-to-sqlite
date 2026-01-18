@@ -780,6 +780,25 @@ pub static TYPE_DOGMA_ATTRIBUTES: TableSchema = TableSchema {
     }),
 };
 
+pub static TYPE_DOGMA_EFFECTS: TableSchema = TableSchema {
+    name: "type_dogma_effects",
+    source_file: "typeDogma.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("effect_id", ColumnType::Integer),
+        Column::new("is_default", ColumnType::Boolean),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("effect_id", "dogma_effects"),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "dogmaEffects",
+        parent_id_column: "type_id",
+    }),
+};
+
 pub static TYPE_MATERIALS: TableSchema = TableSchema {
     name: "type_materials",
     source_file: "typeMaterials.jsonl",
@@ -909,6 +928,7 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &NPC_STATIONS,
     // Wave 6: Junction tables (from nested arrays)
     &TYPE_DOGMA_ATTRIBUTES,
+    &TYPE_DOGMA_EFFECTS,
     &TYPE_MATERIALS,
     &BLUEPRINT_MATERIALS,
     &BLUEPRINT_PRODUCTS,
