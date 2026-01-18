@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
-use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::io::{Read, Write};
 use std::path::Path;
+
+use crate::ui::Ui;
 
 const LATEST_URL: &str = "https://developers.eveonline.com/static-data/tranquility/latest.jsonl";
 const ZIP_URL: &str =
@@ -47,7 +48,7 @@ impl SdeClient {
     }
 
     /// Download the SDE zip file to the given path
-    pub fn download_zip(&self, dest: &Path) -> Result<()> {
+    pub fn download_zip(&self, dest: &Path, ui: &mut impl Ui) -> Result<()> {
         let response = self
             .client
             .get(ZIP_URL)
@@ -55,15 +56,6 @@ impl SdeClient {
             .context("Failed to start download")?;
 
         let total_size = response.content_length().unwrap_or(0);
-
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        pb.set_message("Downloading SDE");
 
         let mut file = std::fs::File::create(dest).context("Failed to create destination file")?;
 
@@ -84,16 +76,44 @@ impl SdeClient {
                 .context("Failed to write to file")?;
 
             downloaded += bytes_read as u64;
-            pb.set_position(downloaded);
+            ui.set_progress(downloaded, total_size, format_bytes(downloaded, total_size));
         }
 
-        pb.finish_with_message("Download complete");
+        ui.log("Download complete");
         Ok(())
     }
+}
+
+/// Format bytes as human-readable string
+fn format_bytes(current: u64, total: u64) -> String {
+    fn fmt(bytes: u64) -> String {
+        if bytes >= 1_000_000_000 {
+            format!("{:.1} GB", bytes as f64 / 1_000_000_000.0)
+        } else if bytes >= 1_000_000 {
+            format!("{:.1} MB", bytes as f64 / 1_000_000.0)
+        } else if bytes >= 1_000 {
+            format!("{:.1} KB", bytes as f64 / 1_000.0)
+        } else {
+            format!("{} B", bytes)
+        }
+    }
+    format!("{} / {}", fmt(current), fmt(total))
 }
 
 impl Default for SdeClient {
     fn default() -> Self {
         Self::new().expect("Failed to create HTTP client")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_bytes() {
+        assert_eq!(format_bytes(500, 999), "500 B / 999 B");
+        assert_eq!(format_bytes(1500, 3000), "1.5 KB / 3.0 KB");
+        assert_eq!(format_bytes(1_500_000, 3_000_000), "1.5 MB / 3.0 MB");
     }
 }

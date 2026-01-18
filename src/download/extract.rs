@@ -1,29 +1,22 @@
 use anyhow::{Context, Result};
-use indicatif::{ProgressBar, ProgressStyle};
 use std::fs::{self, File};
 use std::io::{self, BufReader};
 use std::path::Path;
 use zip::ZipArchive;
 
+use crate::ui::Ui;
+
 /// Extract a zip file to the destination directory
-pub fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
+pub fn extract_zip(zip_path: &Path, dest_dir: &Path, ui: &mut impl Ui) -> Result<()> {
     let file = File::open(zip_path).context("Failed to open zip file")?;
     let reader = BufReader::new(file);
     let mut archive = ZipArchive::new(reader).context("Failed to read zip archive")?;
 
     fs::create_dir_all(dest_dir).context("Failed to create destination directory")?;
 
-    let total_files = archive.len();
-    let pb = ProgressBar::new(total_files as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{msg} [{bar:40.cyan/blue}] {pos}/{len} files")
-            .unwrap()
-            .progress_chars("=>-"),
-    );
-    pb.set_message("Extracting");
+    let total_files = archive.len() as u64;
 
-    for i in 0..total_files {
+    for i in 0..archive.len() {
         let mut file = archive
             .by_index(i)
             .context("Failed to read file from archive")?;
@@ -38,7 +31,7 @@ pub fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
 
         // Only extract .jsonl files
         if !file_name.ends_with(".jsonl") {
-            pb.inc(1);
+            ui.set_progress((i + 1) as u64, total_files, "Extracting files");
             continue;
         }
 
@@ -49,9 +42,9 @@ pub fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
         io::copy(&mut file, &mut dest_file)
             .with_context(|| format!("Failed to extract: {}", file_name))?;
 
-        pb.inc(1);
+        ui.set_progress((i + 1) as u64, total_files, "Extracting files");
     }
 
-    pb.finish_with_message("Extraction complete");
+    ui.log("Extraction complete");
     Ok(())
 }

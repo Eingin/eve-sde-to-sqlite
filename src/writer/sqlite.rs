@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rusqlite::Connection;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -8,6 +7,7 @@ use std::path::Path;
 use super::schema_gen::{generate_create_table, generate_indexes};
 use crate::parser::{parse_junction_records, parse_record, ParsedRow};
 use crate::schema::{ColumnType, TableSchema, LANGUAGES};
+use crate::ui::Ui;
 
 const BATCH_SIZE: usize = 1000;
 
@@ -36,10 +36,10 @@ impl SqliteWriter {
     }
 
     /// Create all tables for the given schemas
-    pub fn create_tables(&self, schemas: &[&TableSchema]) -> Result<()> {
-        println!("Creating {} tables...", schemas.len());
+    pub fn create_tables(&self, schemas: &[&TableSchema], ui: &mut impl Ui) -> Result<()> {
+        ui.log(format!("Creating {} tables...", schemas.len()));
 
-        for schema in schemas {
+        for (i, schema) in schemas.iter().enumerate() {
             let sql = generate_create_table(schema);
             self.conn
                 .execute(&sql, [])
@@ -50,6 +50,8 @@ impl SqliteWriter {
                     .execute(&index_sql, [])
                     .with_context(|| format!("Failed to create index for: {}", schema.name))?;
             }
+
+            ui.set_progress((i + 1) as u64, schemas.len() as u64, "Creating tables");
         }
 
         Ok(())
@@ -60,12 +62,13 @@ impl SqliteWriter {
         &mut self,
         schema: &TableSchema,
         input_dir: &Path,
-        progress: &ProgressBar,
+        line_count: u64,
+        ui: &mut impl Ui,
     ) -> Result<u64> {
         let file_path = input_dir.join(schema.source_file);
 
         if !file_path.exists() {
-            progress.finish_with_message(format!("{}: skipped (file not found)", schema.name));
+            ui.log(format!("{}: skipped (file not found)", schema.name));
             return Ok(0);
         }
 
@@ -107,7 +110,7 @@ impl SqliteWriter {
                     if batch.len() >= BATCH_SIZE {
                         insert_batch(&tx, &insert_sql, &columns, &batch)?;
                         count += batch.len() as u64;
-                        progress.set_position(count);
+                        ui.set_progress(count, line_count, schema.name);
                         batch.clear();
                     }
                 }
@@ -121,7 +124,7 @@ impl SqliteWriter {
                 if batch.len() >= BATCH_SIZE {
                     insert_batch(&tx, &insert_sql, &columns, &batch)?;
                     count += batch.len() as u64;
-                    progress.set_position(count);
+                    ui.set_progress(count, line_count, schema.name);
                     batch.clear();
                 }
             }
@@ -134,15 +137,14 @@ impl SqliteWriter {
         }
 
         tx.commit()?;
-        progress.set_position(count);
-        progress.finish_with_message(format!("{}: {} records", schema.name, count));
+        ui.log(format!("{}: {} records", schema.name, count));
 
         Ok(count)
     }
 
     /// Finalize the database (enable FKs, optimize, etc.)
-    pub fn finalize(self) -> Result<()> {
-        println!("Finalizing database...");
+    pub fn finalize(self, ui: &mut impl Ui) -> Result<()> {
+        ui.log("Finalizing database...");
 
         // Enable foreign keys for future use
         self.conn.execute("PRAGMA foreign_keys = ON;", [])?;
@@ -196,28 +198,29 @@ fn insert_batch(
     Ok(())
 }
 
-/// Convert JSONL files to SQLite with progress bars
+/// Convert JSONL files to SQLite with UI progress
 pub fn convert_to_sqlite(
     input_dir: &Path,
     output_db: &Path,
     tables: Vec<&TableSchema>,
+    ui: &mut impl Ui,
 ) -> Result<u64> {
     let mut writer = SqliteWriter::new(output_db)?;
 
     // Create all tables first
-    writer.create_tables(&tables)?;
-
-    // Set up progress bars
-    let multi = MultiProgress::new();
-    let style = ProgressStyle::default_bar()
-        .template("{msg:30} [{bar:40.cyan/blue}] {pos}/{len}")
-        .unwrap()
-        .progress_chars("=>-");
+    writer.create_tables(&tables, ui)?;
 
     let mut total_records: u64 = 0;
 
-    for schema in &tables {
-        // Count lines for progress bar
+    for (i, schema) in tables.iter().enumerate() {
+        ui.log(format!(
+            "Importing table {}/{}: {}",
+            i + 1,
+            tables.len(),
+            schema.name
+        ));
+
+        // Count lines for progress estimation
         let file_path = input_dir.join(schema.source_file);
         let line_count = if file_path.exists() {
             BufReader::new(File::open(&file_path)?).lines().count() as u64
@@ -225,15 +228,11 @@ pub fn convert_to_sqlite(
             0
         };
 
-        let pb = multi.add(ProgressBar::new(line_count));
-        pb.set_style(style.clone());
-        pb.set_message(schema.name.to_string());
-
-        let count = writer.import_table(schema, input_dir, &pb)?;
+        let count = writer.import_table(schema, input_dir, line_count, ui)?;
         total_records += count;
     }
 
-    writer.finalize()?;
+    writer.finalize(ui)?;
 
     Ok(total_records)
 }

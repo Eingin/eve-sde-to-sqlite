@@ -11,12 +11,14 @@ categories = ["command-line-utilities", "database"]
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+crossterm = "0.28"
 directories = "5"
-indicatif = "0.17"
+ratatui = "0.29"
 reqwest = { version = "0.12", features = ["blocking"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tuirealm = "2"
 zip = "2"
 
 [dev-dependencies]

@@ -5,6 +5,10 @@ use std::path::PathBuf;
 #[command(name = "eve-sde-to-sqlite")]
 #[command(version, about = "Convert EVE Online SDE to SQLite database")]
 pub struct Cli {
+    /// Run without TUI (quiet mode, prints summary only)
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }

@@ -23,6 +23,7 @@ use std::sync::Mutex;
 use tempfile::NamedTempFile;
 
 use eve_sde_to_sqlite::schema::tables::ALL_TABLES;
+use eve_sde_to_sqlite::ui::SilentUi;
 use eve_sde_to_sqlite::writer::convert_to_sqlite;
 
 // =============================================================================
@@ -64,8 +65,10 @@ impl TestDatabase {
 
         // Convert all JSONL files to SQLite
         let tables: Vec<_> = ALL_TABLES.iter().copied().collect();
+        let mut ui = SilentUi::new();
 
-        convert_to_sqlite(&jsonl_dir, &db_path, tables).expect("Failed to convert JSONL to SQLite");
+        convert_to_sqlite(&jsonl_dir, &db_path, tables, &mut ui)
+            .expect("Failed to convert JSONL to SQLite");
 
         Self {
             _temp_file: temp_file,
