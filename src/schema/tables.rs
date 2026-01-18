@@ -15,6 +15,7 @@ pub static CATEGORIES: TableSchema = TableSchema {
         Column::new("published", ColumnType::Boolean),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"]), Index::on(&["published"])],
     child_tables: &[],
     array_source: None,
 };
@@ -28,6 +29,7 @@ pub static DOGMA_ATTRIBUTE_CATEGORIES: TableSchema = TableSchema {
         Column::new("name", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name"])],
     child_tables: &[],
     array_source: None,
 };
@@ -42,6 +44,7 @@ pub static DOGMA_UNITS: TableSchema = TableSchema {
         Column::new("name", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name"])],
     child_tables: &[],
     array_source: None,
 };
@@ -55,6 +58,7 @@ pub static ICONS: TableSchema = TableSchema {
         Column::new("icon_file", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[],
     child_tables: &[],
     array_source: None,
 };
@@ -71,6 +75,7 @@ pub static GRAPHICS: TableSchema = TableSchema {
         Column::new("sof_race_name", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[],
     child_tables: &[],
     array_source: None,
 };
@@ -83,6 +88,7 @@ pub static AGENT_TYPES: TableSchema = TableSchema {
         Column::new("name", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[],
     child_tables: &[],
     array_source: None,
 };
@@ -95,6 +101,7 @@ pub static STATION_SERVICES: TableSchema = TableSchema {
         Column::new("service_name", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["service_name"])],
     child_tables: &[],
     array_source: None,
 };
@@ -107,6 +114,7 @@ pub static CORPORATION_ACTIVITIES: TableSchema = TableSchema {
         Column::new("name", ColumnType::Localized),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"])],
     child_tables: &[],
     array_source: None,
 };
@@ -122,6 +130,7 @@ pub static META_GROUPS: TableSchema = TableSchema {
         Column::new("icon_suffix", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"])],
     child_tables: &[],
     array_source: None,
 };
@@ -138,6 +147,7 @@ pub static CHARACTER_ATTRIBUTES: TableSchema = TableSchema {
         Column::new("icon_id", ColumnType::Integer),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"])],
     child_tables: &[],
     array_source: None,
 };
@@ -150,6 +160,7 @@ pub static TRANSLATION_LANGUAGES: TableSchema = TableSchema {
         Column::new("name", ColumnType::Text),
     ],
     foreign_keys: &[],
+    indexes: &[],
     child_tables: &[],
     array_source: None,
 };
@@ -163,7 +174,86 @@ pub static SKIN_MATERIALS: TableSchema = TableSchema {
         Column::new("material_set_id", ColumnType::Integer),
     ],
     foreign_keys: &[],
+    indexes: &[
+        Index::on(&["display_name_en"]),
+        Index::on(&["material_set_id"]),
+    ],
     child_tables: &[],
+    array_source: None,
+};
+
+pub static LANDMARKS: TableSchema = TableSchema {
+    name: "landmarks",
+    source_file: "landmarks.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("name", ColumnType::Localized),
+        Column::new("description", ColumnType::Localized),
+        Column::new("importance", ColumnType::Integer),
+        Column::new("location_id", ColumnType::Integer),
+        Column::new("position_x", ColumnType::Real),
+        Column::new("position_y", ColumnType::Real),
+        Column::new("position_z", ColumnType::Real),
+    ],
+    foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"]), Index::on(&["location_id"])],
+    child_tables: &[],
+    array_source: None,
+};
+
+pub static NPC_CORPORATION_DIVISIONS: TableSchema = TableSchema {
+    name: "npc_corporation_divisions",
+    source_file: "npcCorporationDivisions.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("name", ColumnType::Localized),
+        Column::new("display_name", ColumnType::Text),
+        Column::new("internal_name", ColumnType::Text),
+        Column::new("leader_type_name", ColumnType::Localized),
+    ],
+    foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"])],
+    child_tables: &[],
+    array_source: None,
+};
+
+pub static PLANET_RESOURCES: TableSchema = TableSchema {
+    name: "planet_resources",
+    source_file: "planetResources.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("power", ColumnType::Integer),
+    ],
+    foreign_keys: &[],
+    indexes: &[],
+    child_tables: &[],
+    array_source: None,
+};
+
+pub static CLONE_GRADES: TableSchema = TableSchema {
+    name: "clone_grades",
+    source_file: "cloneGrades.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("name", ColumnType::Text),
+    ],
+    foreign_keys: &[],
+    indexes: &[],
+    child_tables: &["clone_grade_skills"],
+    array_source: None,
+};
+
+pub static PLANET_SCHEMATICS: TableSchema = TableSchema {
+    name: "planet_schematics",
+    source_file: "planetSchematics.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("name", ColumnType::Localized),
+        Column::new("cycle_time", ColumnType::Integer),
+    ],
+    foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"])],
+    child_tables: &["planet_schematic_pins", "planet_schematic_types"],
     array_source: None,
 };
 
@@ -182,6 +272,7 @@ pub static RACES: TableSchema = TableSchema {
         Column::new("ship_type_id", ColumnType::Integer),
     ],
     foreign_keys: &[ForeignKey::new("icon_id", "icons")],
+    indexes: &[Index::on(&["name_en"])],
     child_tables: &[],
     array_source: None,
 };
@@ -203,6 +294,11 @@ pub static GROUPS: TableSchema = TableSchema {
     foreign_keys: &[
         ForeignKey::new("category_id", "categories"),
         ForeignKey::new("icon_id", "icons"),
+    ],
+    indexes: &[
+        Index::on(&["category_id"]),
+        Index::on(&["name_en"]),
+        Index::on(&["published"]),
     ],
     child_tables: &[],
     array_source: None,
@@ -232,6 +328,11 @@ pub static DOGMA_ATTRIBUTES: TableSchema = TableSchema {
         ForeignKey::new("attribute_category_id", "dogma_attribute_categories"),
         ForeignKey::new("icon_id", "icons"),
         ForeignKey::new("unit_id", "dogma_units"),
+    ],
+    indexes: &[
+        Index::on(&["unit_id"]),
+        Index::on(&["name"]),
+        Index::on(&["published"]),
     ],
     child_tables: &[],
     array_source: None,
@@ -267,6 +368,11 @@ pub static DOGMA_EFFECTS: TableSchema = TableSchema {
         Column::new("resistance_attribute_id", ColumnType::Integer),
     ],
     foreign_keys: &[ForeignKey::new("icon_id", "icons")],
+    indexes: &[
+        Index::on(&["icon_id"]),
+        Index::on(&["name"]),
+        Index::on(&["published"]),
+    ],
     child_tables: &[],
     array_source: None,
 };
@@ -294,6 +400,7 @@ pub static MAP_REGIONS: TableSchema = TableSchema {
         Column::new("wormhole_class_id", ColumnType::Integer),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["faction_id"]), Index::on(&["name_en"])],
     child_tables: &[],
     array_source: None,
 };
@@ -312,6 +419,11 @@ pub static MARKET_GROUPS: TableSchema = TableSchema {
     foreign_keys: &[
         ForeignKey::new("icon_id", "icons"),
         ForeignKey::new("parent_group_id", "market_groups"),
+    ],
+    indexes: &[
+        Index::on(&["parent_group_id"]),
+        Index::on(&["icon_id"]),
+        Index::on(&["name_en"]),
     ],
     child_tables: &[],
     array_source: None,
@@ -334,6 +446,10 @@ pub static STATION_OPERATIONS: TableSchema = TableSchema {
         Column::new("research_factor", ColumnType::Real),
     ],
     foreign_keys: &[],
+    indexes: &[
+        Index::on(&["activity_id"]),
+        Index::on(&["operation_name_en"]),
+    ],
     child_tables: &[],
     array_source: None,
 };
@@ -350,6 +466,7 @@ pub static SKINS: TableSchema = TableSchema {
         Column::new("visible_tranquility", ColumnType::Boolean),
     ],
     foreign_keys: &[ForeignKey::new("skin_material_id", "skin_materials")],
+    indexes: &[Index::on(&["skin_material_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -378,6 +495,11 @@ pub static BLOODLINES: TableSchema = TableSchema {
         ForeignKey::new("race_id", "races"),
         ForeignKey::new("icon_id", "icons"),
     ],
+    indexes: &[
+        Index::on(&["race_id"]),
+        Index::on(&["corporation_id"]),
+        Index::on(&["name_en"]),
+    ],
     child_tables: &[],
     array_source: None,
 };
@@ -398,6 +520,13 @@ pub static FACTIONS: TableSchema = TableSchema {
         Column::new("unique_name", ColumnType::Boolean),
     ],
     foreign_keys: &[ForeignKey::new("icon_id", "icons")],
+    indexes: &[
+        Index::on(&["icon_id"]),
+        Index::on(&["solar_system_id"]),
+        Index::on(&["corporation_id"]),
+        Index::on(&["militia_corporation_id"]),
+        Index::on(&["name_en"]),
+    ],
     child_tables: &[],
     array_source: None,
 };
@@ -426,6 +555,7 @@ pub static NPC_CORPORATIONS: TableSchema = TableSchema {
         Column::new("tax_rate", ColumnType::Real),
     ],
     foreign_keys: &[],
+    indexes: &[Index::on(&["name_en"]), Index::on(&["ticker_name"])],
     child_tables: &[],
     array_source: None,
 };
@@ -450,6 +580,11 @@ pub static MAP_CONSTELLATIONS: TableSchema = TableSchema {
         Column::new("radius", ColumnType::Real),
     ],
     foreign_keys: &[ForeignKey::new("region_id", "map_regions")],
+    indexes: &[
+        Index::on(&["region_id"]),
+        Index::on(&["faction_id"]),
+        Index::on(&["name_en"]),
+    ],
     child_tables: &[],
     array_source: None,
 };
@@ -488,6 +623,84 @@ pub static TYPES: TableSchema = TableSchema {
         ForeignKey::new("meta_group_id", "meta_groups"),
         ForeignKey::new("race_id", "races"),
     ],
+    indexes: &[
+        Index::on(&["group_id"]),
+        Index::on(&["graphic_id"]),
+        Index::on(&["icon_id"]),
+        Index::on(&["market_group_id"]),
+        Index::on(&["meta_group_id"]),
+        Index::on(&["race_id"]),
+        Index::on(&["name_en"]),
+        Index::on(&["published"]),
+    ],
+    child_tables: &[],
+    array_source: None,
+};
+
+pub static COMPRESSIBLE_TYPES: TableSchema = TableSchema {
+    name: "compressible_types",
+    source_file: "compressibleTypes.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("compressed_type_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("id", "types"),
+        ForeignKey::new("compressed_type_id", "types"),
+    ],
+    indexes: &[Index::on(&["compressed_type_id"])],
+    child_tables: &[],
+    array_source: None,
+};
+
+pub static NPC_CHARACTERS: TableSchema = TableSchema {
+    name: "npc_characters",
+    source_file: "npcCharacters.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("name", ColumnType::Localized),
+        Column::new("bloodline_id", ColumnType::Integer),
+        Column::new("corporation_id", ColumnType::Integer),
+        Column::new("race_id", ColumnType::Integer),
+        Column::new("location_id", ColumnType::Integer),
+        Column::new("ceo", ColumnType::Boolean),
+        Column::new("gender", ColumnType::Boolean),
+        Column::new("start_date", ColumnType::Text),
+        Column::new("unique_name", ColumnType::Boolean),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("bloodline_id", "bloodlines"),
+        ForeignKey::new("corporation_id", "npc_corporations"),
+        ForeignKey::new("race_id", "races"),
+    ],
+    indexes: &[
+        Index::on(&["bloodline_id"]),
+        Index::on(&["corporation_id"]),
+        Index::on(&["race_id"]),
+        Index::on(&["name_en"]),
+    ],
+    child_tables: &[],
+    array_source: None,
+};
+
+/// Sovereignty upgrades - simple table with flattened nested "fuel" object
+pub static SOVEREIGNTY_UPGRADES: TableSchema = TableSchema {
+    name: "sovereignty_upgrades",
+    source_file: "sovereigntyUpgrades.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("fuel_type_id", ColumnType::Integer),
+        Column::new("fuel_hourly_upkeep", ColumnType::Integer),
+        Column::new("fuel_startup_cost", ColumnType::Integer),
+        Column::new("mutually_exclusive_group", ColumnType::Text),
+        Column::new("power_allocation", ColumnType::Integer),
+        Column::new("workforce_allocation", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("id", "types"),
+        ForeignKey::new("fuel_type_id", "types"),
+    ],
+    indexes: &[Index::on(&["fuel_type_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -515,6 +728,11 @@ pub static ANCESTRIES: TableSchema = TableSchema {
     foreign_keys: &[
         ForeignKey::new("bloodline_id", "bloodlines"),
         ForeignKey::new("icon_id", "icons"),
+    ],
+    indexes: &[
+        Index::on(&["bloodline_id"]),
+        Index::on(&["icon_id"]),
+        Index::on(&["name_en"]),
     ],
     child_tables: &[],
     array_source: None,
@@ -547,6 +765,12 @@ pub static MAP_SOLAR_SYSTEMS: TableSchema = TableSchema {
         ForeignKey::new("constellation_id", "map_constellations"),
         ForeignKey::new("region_id", "map_regions"),
     ],
+    indexes: &[
+        Index::on(&["constellation_id"]),
+        Index::on(&["star_id"]),
+        Index::on(&["name_en"]),
+        Index::on(&["security_status"]),
+    ],
     child_tables: &[],
     array_source: None,
 };
@@ -566,6 +790,7 @@ pub static BLUEPRINTS: TableSchema = TableSchema {
         Column::new("reaction_time", ColumnType::Integer),
     ],
     foreign_keys: &[ForeignKey::new("blueprint_type_id", "types")],
+    indexes: &[Index::on(&["blueprint_type_id"])],
     child_tables: &[
         "blueprint_materials",
         "blueprint_products",
@@ -587,6 +812,7 @@ pub static SKIN_LICENSES: TableSchema = TableSchema {
         ForeignKey::new("license_type_id", "types"),
         ForeignKey::new("skin_id", "skins"),
     ],
+    indexes: &[Index::on(&["skin_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -601,6 +827,7 @@ pub static CERTIFICATES: TableSchema = TableSchema {
         Column::new("group_id", ColumnType::Integer),
     ],
     foreign_keys: &[ForeignKey::new("group_id", "groups")],
+    indexes: &[Index::on(&["name_en"])],
     child_tables: &[],
     array_source: None,
 };
@@ -628,6 +855,7 @@ pub static MAP_STARS: TableSchema = TableSchema {
         ForeignKey::new("solar_system_id", "map_solar_systems"),
         ForeignKey::new("type_id", "types"),
     ],
+    indexes: &[Index::on(&["solar_system_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -652,6 +880,7 @@ pub static MAP_PLANETS: TableSchema = TableSchema {
         ForeignKey::new("solar_system_id", "map_solar_systems"),
         ForeignKey::new("type_id", "types"),
     ],
+    indexes: &[Index::on(&["solar_system_id"]), Index::on(&["type_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -677,6 +906,7 @@ pub static MAP_MOONS: TableSchema = TableSchema {
         ForeignKey::new("planet_id", "map_planets"),
         ForeignKey::new("type_id", "types"),
     ],
+    indexes: &[Index::on(&["planet_id"]), Index::on(&["type_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -701,6 +931,7 @@ pub static MAP_ASTEROID_BELTS: TableSchema = TableSchema {
         ForeignKey::new("planet_id", "map_planets"),
         ForeignKey::new("type_id", "types"),
     ],
+    indexes: &[Index::on(&["planet_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -722,6 +953,11 @@ pub static MAP_STARGATES: TableSchema = TableSchema {
         ForeignKey::new("solar_system_id", "map_solar_systems"),
         ForeignKey::new("type_id", "types"),
         ForeignKey::new("destination_solar_system_id", "map_solar_systems"),
+    ],
+    indexes: &[
+        Index::on(&["solar_system_id"]),
+        Index::on(&["destination_stargate_id"]),
+        Index::on(&["type_id"]),
     ],
     child_tables: &[],
     array_source: None,
@@ -753,6 +989,31 @@ pub static NPC_STATIONS: TableSchema = TableSchema {
         ForeignKey::new("owner_id", "npc_corporations"),
         ForeignKey::new("operation_id", "station_operations"),
     ],
+    indexes: &[
+        Index::on(&["solar_system_id"]),
+        Index::on(&["operation_id"]),
+        Index::on(&["type_id"]),
+        Index::on(&["owner_id"]),
+    ],
+    child_tables: &[],
+    array_source: None,
+};
+
+pub static AGENTS_IN_SPACE: TableSchema = TableSchema {
+    name: "agents_in_space",
+    source_file: "agentsInSpace.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("dungeon_id", ColumnType::Integer),
+        Column::new("solar_system_id", ColumnType::Integer),
+        Column::new("spawn_point_id", ColumnType::Integer),
+        Column::new("type_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("solar_system_id", "map_solar_systems"),
+        ForeignKey::new("type_id", "types"),
+    ],
+    indexes: &[Index::on(&["solar_system_id"]), Index::on(&["type_id"])],
     child_tables: &[],
     array_source: None,
 };
@@ -773,6 +1034,7 @@ pub static TYPE_DOGMA_ATTRIBUTES: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
         ForeignKey::new("attribute_id", "dogma_attributes"),
     ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["attribute_id"])],
     child_tables: &[],
     array_source: Some(ArraySource::Simple {
         array_field: "dogmaAttributes",
@@ -792,6 +1054,7 @@ pub static TYPE_DOGMA_EFFECTS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
         ForeignKey::new("effect_id", "dogma_effects"),
     ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["effect_id"])],
     child_tables: &[],
     array_source: Some(ArraySource::Simple {
         array_field: "dogmaEffects",
@@ -811,6 +1074,7 @@ pub static TYPE_MATERIALS: TableSchema = TableSchema {
         ForeignKey::new("type_id", "types"),
         ForeignKey::new("material_type_id", "types"),
     ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["material_type_id"])],
     child_tables: &[],
     array_source: Some(ArraySource::Simple {
         array_field: "materials",
@@ -830,6 +1094,11 @@ pub static BLUEPRINT_MATERIALS: TableSchema = TableSchema {
     foreign_keys: &[
         ForeignKey::new("blueprint_id", "blueprints"),
         ForeignKey::new("type_id", "types"),
+    ],
+    indexes: &[
+        Index::on(&["blueprint_id"]),
+        Index::on(&["type_id"]),
+        Index::on(&["activity"]),
     ],
     child_tables: &[],
     array_source: Some(ArraySource::BlueprintActivity {
@@ -852,6 +1121,11 @@ pub static BLUEPRINT_PRODUCTS: TableSchema = TableSchema {
         ForeignKey::new("blueprint_id", "blueprints"),
         ForeignKey::new("type_id", "types"),
     ],
+    indexes: &[
+        Index::on(&["blueprint_id"]),
+        Index::on(&["type_id"]),
+        Index::on(&["activity"]),
+    ],
     child_tables: &[],
     array_source: Some(ArraySource::BlueprintActivity {
         activity_column: "activity",
@@ -872,11 +1146,346 @@ pub static BLUEPRINT_SKILLS: TableSchema = TableSchema {
         ForeignKey::new("blueprint_id", "blueprints"),
         ForeignKey::new("type_id", "types"),
     ],
+    indexes: &[
+        Index::on(&["blueprint_id"]),
+        Index::on(&["type_id"]),
+        Index::on(&["activity"]),
+    ],
     child_tables: &[],
     array_source: Some(ArraySource::BlueprintActivity {
         activity_column: "activity",
         array_field: "skills",
     }),
+};
+
+pub static CLONE_GRADE_SKILLS: TableSchema = TableSchema {
+    name: "clone_grade_skills",
+    source_file: "cloneGrades.jsonl",
+    columns: &[
+        Column::required("clone_grade_id", ColumnType::Integer),
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("level", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("clone_grade_id", "clone_grades"),
+        ForeignKey::new("type_id", "types"),
+    ],
+    indexes: &[Index::on(&["clone_grade_id"]), Index::on(&["type_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "skills",
+        parent_id_column: "clone_grade_id",
+    }),
+};
+
+pub static CONTRABAND_TYPE_FACTIONS: TableSchema = TableSchema {
+    name: "contraband_type_factions",
+    source_file: "contrabandTypes.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("faction_id", ColumnType::Integer).json("_key"),
+        Column::new("attack_min_sec", ColumnType::Real),
+        Column::new("confiscate_min_sec", ColumnType::Real),
+        Column::new("fine_by_value", ColumnType::Real),
+        Column::new("standing_loss", ColumnType::Real),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("faction_id", "factions"),
+    ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["faction_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "factions",
+        parent_id_column: "type_id",
+    }),
+};
+
+pub static CONTROL_TOWER_RESOURCES: TableSchema = TableSchema {
+    name: "control_tower_resources",
+    source_file: "controlTowerResources.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("resource_type_id", ColumnType::Integer),
+        Column::new("purpose", ColumnType::Integer),
+        Column::new("quantity", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("resource_type_id", "types"),
+    ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["resource_type_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "resources",
+        parent_id_column: "type_id",
+    }),
+};
+
+pub static DYNAMIC_ITEM_ATTRIBUTES: TableSchema = TableSchema {
+    name: "dynamic_item_attributes",
+    source_file: "dynamicItemAttributes.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("attribute_id", ColumnType::Integer).json("_key"),
+        Column::new("min", ColumnType::Real),
+        Column::new("max", ColumnType::Real),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("attribute_id", "dogma_attributes"),
+    ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["attribute_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "attributeIDs",
+        parent_id_column: "type_id",
+    }),
+};
+
+pub static PLANET_SCHEMATIC_PINS: TableSchema = TableSchema {
+    name: "planet_schematic_pins",
+    source_file: "planetSchematics.jsonl",
+    columns: &[
+        Column::required("schematic_id", ColumnType::Integer),
+        Column::required("pin_type_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("schematic_id", "planet_schematics"),
+        ForeignKey::new("pin_type_id", "types"),
+    ],
+    indexes: &[Index::on(&["schematic_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::SimpleIntArray {
+        array_field: "pins",
+        parent_id_column: "schematic_id",
+        value_column: "pin_type_id",
+    }),
+};
+
+pub static PLANET_SCHEMATIC_TYPES: TableSchema = TableSchema {
+    name: "planet_schematic_types",
+    source_file: "planetSchematics.jsonl",
+    columns: &[
+        Column::required("schematic_id", ColumnType::Integer),
+        Column::required("type_id", ColumnType::Integer).json("_key"),
+        Column::new("is_input", ColumnType::Boolean),
+        Column::new("quantity", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("schematic_id", "planet_schematics"),
+        ForeignKey::new("type_id", "types"),
+    ],
+    indexes: &[Index::on(&["schematic_id"]), Index::on(&["type_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "types",
+        parent_id_column: "schematic_id",
+    }),
+};
+
+// =============================================================================
+// Complex Nested Tables (require special parser handling)
+// =============================================================================
+
+/// Role bonuses for types (from typeBonus.jsonl roleBonuses array)
+/// Format: {"_key": 582, "roleBonuses": [{"bonus": 300.0, "bonusText": {...}, "importance": 1, "unitID": 105}], ...}
+pub static TYPE_ROLE_BONUSES: TableSchema = TableSchema {
+    name: "type_role_bonuses",
+    source_file: "typeBonus.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::new("bonus", ColumnType::Real),
+        Column::new("bonus_text", ColumnType::Localized),
+        Column::new("importance", ColumnType::Integer),
+        Column::new("unit_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("unit_id", "dogma_units"),
+    ],
+    indexes: &[Index::on(&["type_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "roleBonuses",
+        parent_id_column: "type_id",
+    }),
+};
+
+/// Trait bonuses for types based on skills (from typeBonus.jsonl types array)
+/// Format: {"_key": 582, "types": [{"_key": 3330, "_value": [{"bonus": 10.0, "bonusText": {...}, ...}]}]}
+/// NOTE: Requires special parser handling - the "types" array contains objects with _key (skill type)
+/// and _value (array of bonuses). Each bonus row needs type_id (parent _key), skill_type_id (nested _key),
+/// and the bonus fields.
+pub static TYPE_TRAIT_BONUSES: TableSchema = TableSchema {
+    name: "type_trait_bonuses",
+    source_file: "typeBonus.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("skill_type_id", ColumnType::Integer),
+        Column::new("bonus", ColumnType::Real),
+        Column::new("bonus_text", ColumnType::Localized),
+        Column::new("importance", ColumnType::Integer),
+        Column::new("is_positive", ColumnType::Boolean),
+        Column::new("unit_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("skill_type_id", "types"),
+        ForeignKey::new("unit_id", "dogma_units"),
+    ],
+    indexes: &[Index::on(&["type_id"]), Index::on(&["skill_type_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::NestedKeyValue {
+        array_field: "types",
+        parent_id_column: "type_id",
+        nested_key_column: "skill_type_id",
+    }),
+};
+
+/// Mastery requirements for types (from masteries.jsonl)
+/// Format: {"_key": 582, "_value": [{"_key": 0, "_value": [96, 139, 85, 87, 94]}, {"_key": 1, "_value": [...]}]}
+/// NOTE: Requires special parser handling - double-nested structure where:
+/// - Parent _key is the type_id
+/// - First level _key (0-4) is the mastery_level
+/// - Inner _value array contains certificate_ids
+pub static TYPE_MASTERIES: TableSchema = TableSchema {
+    name: "type_masteries",
+    source_file: "masteries.jsonl",
+    columns: &[
+        Column::required("type_id", ColumnType::Integer),
+        Column::required("mastery_level", ColumnType::Integer),
+        Column::required("certificate_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("type_id", "types"),
+        ForeignKey::new("certificate_id", "certificates"),
+    ],
+    indexes: &[Index::on(&["type_id"])],
+    child_tables: &[],
+    array_source: Some(ArraySource::DoubleNested {
+        parent_id_column: "type_id",
+        level_key_column: "mastery_level",
+    }),
+};
+
+// =============================================================================
+// Dbuff Collections (damage buff system)
+// =============================================================================
+
+/// Dbuff collections main table
+/// Format: {"_key": 1, "aggregateMode": "Maximum", "developerDescription": "...", ...}
+pub static DBUFF_COLLECTIONS: TableSchema = TableSchema {
+    name: "dbuff_collections",
+    source_file: "dbuffCollections.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        Column::new("aggregate_mode", ColumnType::Text),
+        Column::new("developer_description", ColumnType::Text),
+    ],
+    foreign_keys: &[],
+    indexes: &[],
+    child_tables: &[
+        "dbuff_item_modifiers",
+        "dbuff_location_modifiers",
+        "dbuff_location_group_modifiers",
+    ],
+    array_source: None,
+};
+
+/// Dbuff item modifiers junction table
+/// Format: {"_key": 1, "itemModifiers": [{"dogmaAttributeID": 37}, ...]}
+pub static DBUFF_ITEM_MODIFIERS: TableSchema = TableSchema {
+    name: "dbuff_item_modifiers",
+    source_file: "dbuffCollections.jsonl",
+    columns: &[
+        Column::required("collection_id", ColumnType::Integer),
+        Column::required("dogma_attribute_id", ColumnType::Integer).json("dogmaAttributeID"),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("collection_id", "dbuff_collections"),
+        ForeignKey::new("dogma_attribute_id", "dogma_attributes"),
+    ],
+    indexes: &[
+        Index::on(&["collection_id"]),
+        Index::on(&["dogma_attribute_id"]),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "itemModifiers",
+        parent_id_column: "collection_id",
+    }),
+};
+
+/// Dbuff location modifiers junction table
+/// Format: {"_key": 1, "locationModifiers": [{"dogmaAttributeID": 68}, ...]}
+pub static DBUFF_LOCATION_MODIFIERS: TableSchema = TableSchema {
+    name: "dbuff_location_modifiers",
+    source_file: "dbuffCollections.jsonl",
+    columns: &[
+        Column::required("collection_id", ColumnType::Integer),
+        Column::required("dogma_attribute_id", ColumnType::Integer).json("dogmaAttributeID"),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("collection_id", "dbuff_collections"),
+        ForeignKey::new("dogma_attribute_id", "dogma_attributes"),
+    ],
+    indexes: &[
+        Index::on(&["collection_id"]),
+        Index::on(&["dogma_attribute_id"]),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "locationModifiers",
+        parent_id_column: "collection_id",
+    }),
+};
+
+/// Dbuff location group modifiers junction table
+/// Format: {"_key": 1, "locationGroupModifiers": [{"dogmaAttributeID": 20, "groupID": 46}, ...]}
+pub static DBUFF_LOCATION_GROUP_MODIFIERS: TableSchema = TableSchema {
+    name: "dbuff_location_group_modifiers",
+    source_file: "dbuffCollections.jsonl",
+    columns: &[
+        Column::required("collection_id", ColumnType::Integer),
+        Column::required("dogma_attribute_id", ColumnType::Integer).json("dogmaAttributeID"),
+        Column::required("group_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("collection_id", "dbuff_collections"),
+        ForeignKey::new("dogma_attribute_id", "dogma_attributes"),
+        ForeignKey::new("group_id", "groups"),
+    ],
+    indexes: &[
+        Index::on(&["collection_id"]),
+        Index::on(&["dogma_attribute_id"]),
+        Index::on(&["group_id"]),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "locationGroupModifiers",
+        parent_id_column: "collection_id",
+    }),
+};
+
+// =============================================================================
+// Freelance Job Schemas (complex nested structure - simplified for now)
+// =============================================================================
+
+/// Freelance job schemas - simplified table (complex nested localized content)
+/// Full structure has deeply nested localized content that may need custom handling
+pub static FREELANCE_JOB_SCHEMAS: TableSchema = TableSchema {
+    name: "freelance_job_schemas",
+    source_file: "freelanceJobSchemas.jsonl",
+    columns: &[
+        Column::required("id", ColumnType::Integer),
+        // TODO: Expand with more columns as needed - structure is complex with
+        // deeply nested localized content
+    ],
+    foreign_keys: &[],
+    indexes: &[],
+    child_tables: &[],
+    array_source: None,
 };
 
 // =============================================================================
@@ -898,6 +1507,13 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &CHARACTER_ATTRIBUTES,
     &TRANSLATION_LANGUAGES,
     &SKIN_MATERIALS,
+    &LANDMARKS,
+    &NPC_CORPORATION_DIVISIONS,
+    &PLANET_RESOURCES,
+    &CLONE_GRADES,
+    &PLANET_SCHEMATICS,
+    &DBUFF_COLLECTIONS,
+    &FREELANCE_JOB_SCHEMAS,
     // Wave 2: Level 1 deps
     &RACES,
     &GROUPS,
@@ -913,12 +1529,15 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &NPC_CORPORATIONS,
     &MAP_CONSTELLATIONS,
     &TYPES,
+    &SOVEREIGNTY_UPGRADES,
     // Wave 4: Level 3 deps
     &ANCESTRIES,
     &MAP_SOLAR_SYSTEMS,
     &BLUEPRINTS,
     &SKIN_LICENSES,
     &CERTIFICATES,
+    &COMPRESSIBLE_TYPES,
+    &NPC_CHARACTERS,
     // Wave 5: Level 4 deps (map objects)
     &MAP_STARS,
     &MAP_PLANETS,
@@ -926,6 +1545,7 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &MAP_ASTEROID_BELTS,
     &MAP_STARGATES,
     &NPC_STATIONS,
+    &AGENTS_IN_SPACE,
     // Wave 6: Junction tables (from nested arrays)
     &TYPE_DOGMA_ATTRIBUTES,
     &TYPE_DOGMA_EFFECTS,
@@ -933,6 +1553,19 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &BLUEPRINT_MATERIALS,
     &BLUEPRINT_PRODUCTS,
     &BLUEPRINT_SKILLS,
+    &CLONE_GRADE_SKILLS,
+    &CONTRABAND_TYPE_FACTIONS,
+    &CONTROL_TOWER_RESOURCES,
+    &DYNAMIC_ITEM_ATTRIBUTES,
+    &PLANET_SCHEMATIC_PINS,
+    &PLANET_SCHEMATIC_TYPES,
+    // Wave 7: Complex nested junction tables (require special parser handling)
+    &TYPE_ROLE_BONUSES,
+    &TYPE_TRAIT_BONUSES, // NOTE: Requires NestedKeyValue parser support
+    &TYPE_MASTERIES,     // NOTE: Requires DoubleNested parser support
+    &DBUFF_ITEM_MODIFIERS,
+    &DBUFF_LOCATION_MODIFIERS,
+    &DBUFF_LOCATION_GROUP_MODIFIERS,
 ];
 
 /// Get table schema by name

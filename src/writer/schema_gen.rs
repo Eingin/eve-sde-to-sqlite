@@ -49,75 +49,21 @@ pub fn generate_create_table(schema: &TableSchema) -> String {
     sql
 }
 
-/// Generate CREATE INDEX statements for a table
-///
-/// Automatically creates indexes for:
-/// 1. Foreign key columns (for JOIN performance)
-/// 2. name_en columns (for lookups by name)
-/// 3. Composite unique indexes on junction tables
-/// 4. Boolean filter columns (published, is_*, visible_*, deleted)
-/// 5. Activity columns on blueprint tables
-/// 6. Security status for map queries
+/// Generate CREATE INDEX statements from explicit index definitions
 pub fn generate_indexes(schema: &TableSchema) -> Vec<String> {
-    let mut indexes = Vec::new();
-
-    // 1. Index all foreign key columns
-    for fk in schema.foreign_keys {
-        indexes.push(format!(
-            "CREATE INDEX idx_{}_{} ON {}({})",
-            schema.name, fk.column, schema.name, fk.column
-        ));
-    }
-
-    // 2. Index name_en for tables with localized names
-    let has_name = schema
-        .columns
+    schema
+        .indexes
         .iter()
-        .any(|c| c.name == "name" && c.col_type == ColumnType::Localized);
-    if has_name {
-        indexes.push(format!(
-            "CREATE INDEX idx_{}_name_en ON {}(name_en)",
-            schema.name, schema.name
-        ));
-    }
-
-    // 3. Composite unique index for junction tables with 2 FKs
-    if schema.array_source.is_some() && schema.foreign_keys.len() == 2 {
-        let cols: Vec<_> = schema.foreign_keys.iter().map(|fk| fk.column).collect();
-        indexes.push(format!(
-            "CREATE UNIQUE INDEX idx_{}_composite ON {}({}, {})",
-            schema.name, schema.name, cols[0], cols[1]
-        ));
-    }
-
-    // 4. Index boolean filter columns (very common in WHERE clauses)
-    for col in schema.columns {
-        let dominated_by_fk = schema.foreign_keys.iter().any(|fk| fk.column == col.name);
-        if dominated_by_fk {
-            continue;
-        }
-
-        let should_index = match col.name {
-            // Common filter columns
-            "published" | "deleted" => true,
-            // Activity column for blueprint filtering
-            "activity" => true,
-            // Security status for map filtering
-            "security_status" => true,
-            // is_* and visible_* boolean flags
-            name if name.starts_with("is_") || name.starts_with("visible_") => true,
-            _ => false,
-        };
-
-        if should_index {
-            indexes.push(format!(
-                "CREATE INDEX idx_{}_{} ON {}({})",
-                schema.name, col.name, schema.name, col.name
-            ));
-        }
-    }
-
-    indexes
+        .map(|idx| {
+            let cols = idx.columns.join(", ");
+            let unique = if idx.unique { "UNIQUE " } else { "" };
+            let name_suffix = idx.columns.join("_");
+            format!(
+                "CREATE {}INDEX idx_{}_{} ON {}({})",
+                unique, schema.name, name_suffix, schema.name, cols
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -139,5 +85,6 @@ mod tests {
     fn test_generate_indexes() {
         let indexes = generate_indexes(&TYPES);
         assert!(indexes.iter().any(|i| i.contains("idx_types_group_id")));
+        assert!(indexes.iter().any(|i| i.contains("idx_types_name_en")));
     }
 }

@@ -44,10 +44,30 @@ pub fn parse_junction_records(line: &str, schema: &TableSchema) -> Result<Vec<Pa
             array_field,
             parent_id_column,
         } => parse_simple_array(&json, schema, array_field, parent_id_column),
+        ArraySource::SimpleIntArray {
+            array_field,
+            parent_id_column,
+            value_column,
+        } => parse_simple_int_array(&json, array_field, parent_id_column, value_column),
         ArraySource::BlueprintActivity {
             activity_column,
             array_field,
         } => parse_blueprint_activity(&json, schema, activity_column, array_field),
+        ArraySource::NestedKeyValue {
+            array_field,
+            parent_id_column,
+            nested_key_column,
+        } => parse_nested_key_value(
+            &json,
+            schema,
+            array_field,
+            parent_id_column,
+            nested_key_column,
+        ),
+        ArraySource::DoubleNested {
+            parent_id_column,
+            level_key_column,
+        } => parse_double_nested(&json, schema, parent_id_column, level_key_column),
     }
 }
 
@@ -80,7 +100,11 @@ fn parse_simple_array(
                 continue; // Already added
             }
 
-            let json_key = to_camel_case(col.name);
+            // Use explicit json_field if set, otherwise derive from column name
+            let json_key = col
+                .json_field
+                .map(String::from)
+                .unwrap_or_else(|| to_camel_case(col.name));
             let value = extract_value(item, &json_key, &col.col_type);
             values.insert(col.name.to_string(), value);
         }
@@ -133,6 +157,148 @@ fn parse_blueprint_activity(
 
                 let json_key = to_camel_case(col.name);
                 let value = extract_value(item, &json_key, &col.col_type);
+                values.insert(col.name.to_string(), value);
+            }
+
+            rows.push(ParsedRow { values });
+        }
+    }
+
+    Ok(rows)
+}
+
+/// Parse simple integer array: {"_key": X, "fieldName": [123, 456, ...]}
+fn parse_simple_int_array(
+    json: &Value,
+    array_field: &str,
+    parent_id_column: &str,
+    value_column: &str,
+) -> Result<Vec<ParsedRow>> {
+    let parent_id = json
+        .get("_key")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("Missing _key in JSON"))?;
+
+    let array = match json.get(array_field) {
+        Some(Value::Array(arr)) => arr,
+        _ => return Ok(vec![]), // No array or empty
+    };
+
+    let mut rows = Vec::with_capacity(array.len());
+
+    for item in array {
+        if let Some(value) = item.as_i64() {
+            let mut values = HashMap::new();
+            values.insert(parent_id_column.to_string(), SqlValue::Integer(parent_id));
+            values.insert(value_column.to_string(), SqlValue::Integer(value));
+            rows.push(ParsedRow { values });
+        }
+    }
+
+    Ok(rows)
+}
+
+/// Parse nested key-value array: {"_key": X, "types": [{"_key": Y, "_value": [{...}]}]}
+fn parse_nested_key_value(
+    json: &Value,
+    schema: &TableSchema,
+    array_field: &str,
+    parent_id_column: &str,
+    nested_key_column: &str,
+) -> Result<Vec<ParsedRow>> {
+    let parent_id = json
+        .get("_key")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("Missing _key in JSON"))?;
+
+    let outer_array = match json.get(array_field) {
+        Some(Value::Array(arr)) => arr,
+        _ => return Ok(vec![]),
+    };
+
+    let mut rows = Vec::new();
+
+    for outer_item in outer_array {
+        let nested_key = match outer_item.get("_key").and_then(|v| v.as_i64()) {
+            Some(k) => k,
+            None => continue,
+        };
+
+        let inner_array = match outer_item.get("_value") {
+            Some(Value::Array(arr)) => arr,
+            _ => continue,
+        };
+
+        for item in inner_array {
+            let mut values = HashMap::new();
+            values.insert(parent_id_column.to_string(), SqlValue::Integer(parent_id));
+            values.insert(nested_key_column.to_string(), SqlValue::Integer(nested_key));
+
+            // Extract other columns from the array element
+            for col in schema.columns {
+                if col.name == parent_id_column || col.name == nested_key_column {
+                    continue;
+                }
+
+                let json_key = to_camel_case(col.name);
+                let value = extract_value(item, &json_key, &col.col_type);
+                values.insert(col.name.to_string(), value);
+            }
+
+            rows.push(ParsedRow { values });
+        }
+    }
+
+    Ok(rows)
+}
+
+/// Parse double-nested arrays: {"_key": X, "_value": [{"_key": Y, "_value": [Z, ...]}]}
+fn parse_double_nested(
+    json: &Value,
+    schema: &TableSchema,
+    parent_id_column: &str,
+    level_key_column: &str,
+) -> Result<Vec<ParsedRow>> {
+    let parent_id = json
+        .get("_key")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("Missing _key in JSON"))?;
+
+    let outer_array = match json.get("_value") {
+        Some(Value::Array(arr)) => arr,
+        _ => return Ok(vec![]),
+    };
+
+    let mut rows = Vec::new();
+
+    for outer_item in outer_array {
+        let level_key = match outer_item.get("_key").and_then(|v| v.as_i64()) {
+            Some(k) => k,
+            None => continue,
+        };
+
+        let inner_array = match outer_item.get("_value") {
+            Some(Value::Array(arr)) => arr,
+            _ => continue,
+        };
+
+        for item in inner_array {
+            let mut values = HashMap::new();
+            values.insert(parent_id_column.to_string(), SqlValue::Integer(parent_id));
+            values.insert(level_key_column.to_string(), SqlValue::Integer(level_key));
+
+            // For double-nested, the innermost values are typically just integers (e.g., certificate_id)
+            // Find the remaining column (not parent_id or level_key) and set its value
+            for col in schema.columns {
+                if col.name == parent_id_column || col.name == level_key_column {
+                    continue;
+                }
+
+                // The inner value is typically a plain integer
+                let value = match item.as_i64() {
+                    Some(i) => SqlValue::Integer(i),
+                    None => extract_value(item, &to_camel_case(col.name), &col.col_type),
+                };
                 values.insert(col.name.to_string(), value);
             }
 
