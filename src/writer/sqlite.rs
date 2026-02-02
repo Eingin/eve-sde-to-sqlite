@@ -6,17 +6,18 @@ use std::path::Path;
 
 use super::schema_gen::{generate_create_table, generate_indexes};
 use crate::parser::{parse_junction_records, parse_record, ParsedRow};
-use crate::schema::{ColumnType, TableSchema, LANGUAGES};
+use crate::schema::{ColumnType, LanguageFilter, TableSchema};
 use crate::ui::Ui;
 
 const BATCH_SIZE: usize = 1000;
 
-pub struct SqliteWriter {
+pub struct SqliteWriter<'a> {
     conn: Connection,
+    languages: &'a LanguageFilter,
 }
 
-impl SqliteWriter {
-    pub fn new(db_path: &Path) -> Result<Self> {
+impl<'a> SqliteWriter<'a> {
+    pub fn new(db_path: &Path, languages: &'a LanguageFilter) -> Result<Self> {
         // Remove existing database if present
         if db_path.exists() {
             std::fs::remove_file(db_path).context("Failed to remove existing database")?;
@@ -32,15 +33,19 @@ impl SqliteWriter {
              PRAGMA cache_size = -64000;",
         )?;
 
-        Ok(Self { conn })
+        Ok(Self { conn, languages })
     }
 
     /// Create all tables for the given schemas
     pub fn create_tables(&self, schemas: &[&TableSchema], ui: &mut impl Ui) -> Result<()> {
-        ui.log(format!("Creating {} tables...", schemas.len()));
-
         for (i, schema) in schemas.iter().enumerate() {
-            let sql = generate_create_table(schema);
+            ui.set_progress(
+                (i + 1) as u64,
+                schemas.len() as u64,
+                format!("Creating table: {}", schema.name),
+            );
+
+            let sql = generate_create_table(schema, self.languages);
             self.conn
                 .execute(&sql, [])
                 .with_context(|| format!("Failed to create table: {}", schema.name))?;
@@ -50,8 +55,6 @@ impl SqliteWriter {
                     .execute(&index_sql, [])
                     .with_context(|| format!("Failed to create index for: {}", schema.name))?;
             }
-
-            ui.set_progress((i + 1) as u64, schemas.len() as u64, "Creating tables");
         }
 
         Ok(())
@@ -68,7 +71,6 @@ impl SqliteWriter {
         let file_path = input_dir.join(schema.source_file);
 
         if !file_path.exists() {
-            ui.log(format!("{}: skipped (file not found)", schema.name));
             return Ok(0);
         }
 
@@ -77,7 +79,7 @@ impl SqliteWriter {
         let reader = BufReader::new(file);
 
         // Build insert statement
-        let columns = get_column_names(schema);
+        let columns = get_column_names(schema, self.languages);
         let placeholders: Vec<&str> = columns.iter().map(|_| "?").collect();
         let insert_sql = format!(
             "INSERT INTO {} ({}) VALUES ({})",
@@ -100,9 +102,10 @@ impl SqliteWriter {
 
             if is_junction {
                 // Junction table: one JSON line produces multiple rows
-                let rows = parse_junction_records(&line, schema).with_context(|| {
-                    format!("Failed to parse junction record in {}", schema.source_file)
-                })?;
+                let rows =
+                    parse_junction_records(&line, schema, self.languages).with_context(|| {
+                        format!("Failed to parse junction record in {}", schema.source_file)
+                    })?;
 
                 for row in rows {
                     batch.push(row);
@@ -116,7 +119,7 @@ impl SqliteWriter {
                 }
             } else {
                 // Regular table: one JSON line = one row
-                let row = parse_record(&line, schema)
+                let row = parse_record(&line, schema, self.languages)
                     .with_context(|| format!("Failed to parse record in {}", schema.source_file))?;
 
                 batch.push(row);
@@ -137,14 +140,16 @@ impl SqliteWriter {
         }
 
         tx.commit()?;
-        ui.log(format!("{}: {} records", schema.name, count));
 
         Ok(count)
     }
 
     /// Finalize the database (enable FKs, optimize, etc.)
     pub fn finalize(self, ui: &mut impl Ui) -> Result<()> {
-        ui.log("Finalizing database...");
+        ui.set_info("Finalizing database...");
+
+        // Create convenience views for common queries
+        self.create_views()?;
 
         // Enable foreign keys for future use
         self.conn.execute("PRAGMA foreign_keys = ON;", [])?;
@@ -152,16 +157,85 @@ impl SqliteWriter {
 
         Ok(())
     }
+
+    /// Create convenience views for common query patterns.
+    ///
+    /// Views are created to simplify common queries without sacrificing performance,
+    /// as SQLite optimizes view queries using the underlying table indexes.
+    fn create_views(&self) -> Result<()> {
+        // View: type_bonuses
+        //
+        // Combines role bonuses (always-active ship bonuses) and trait bonuses
+        // (per-skill-level bonuses) into a single unified view.
+        //
+        // This is particularly useful for fitting tools that need to display
+        // all bonuses for a ship or module without writing complex UNION queries.
+        //
+        // Columns:
+        //   - type_id: The ship/module type ID
+        //   - bonus_type: 'role' for role bonuses, 'skill' for skill-based bonuses
+        //   - skill_type_id: The skill type ID (NULL for role bonuses)
+        //   - skill_name: Skill name in English (NULL for role bonuses)
+        //   - bonus: Numeric bonus value (NULL for text-only bonuses like "Can fit X")
+        //   - bonus_text_en: Description text (may contain HTML showinfo links)
+        //   - importance: Display priority (lower = more important)
+        //   - unit_id: Foreign key to dogma_units
+        //   - unit_name: Unit name like 'Percentage', 'Modifier'
+        //   - unit_display: Display symbol like '%', '+'
+        //
+        // Example usage:
+        //   SELECT * FROM type_bonuses WHERE type_id = 22430 ORDER BY bonus_type, importance;
+        //
+        // Performance: Uses indexes on type_role_bonuses(type_id) and
+        // type_trait_bonuses(type_id) for efficient lookups.
+        self.conn.execute_batch(
+            r#"
+            CREATE VIEW IF NOT EXISTS type_bonuses AS
+            SELECT 
+                trb.type_id,
+                'role' AS bonus_type,
+                NULL AS skill_type_id,
+                NULL AS skill_name,
+                trb.bonus,
+                trb.bonus_text_en,
+                trb.importance,
+                trb.unit_id,
+                du.name AS unit_name,
+                du.display_name_en AS unit_display
+            FROM type_role_bonuses trb
+            LEFT JOIN dogma_units du ON trb.unit_id = du.id
+
+            UNION ALL
+
+            SELECT 
+                ttb.type_id,
+                'skill' AS bonus_type,
+                ttb.skill_type_id,
+                t.name_en AS skill_name,
+                ttb.bonus,
+                ttb.bonus_text_en,
+                ttb.importance,
+                ttb.unit_id,
+                du.name AS unit_name,
+                du.display_name_en AS unit_display
+            FROM type_trait_bonuses ttb
+            LEFT JOIN types t ON ttb.skill_type_id = t.id
+            LEFT JOIN dogma_units du ON ttb.unit_id = du.id;
+            "#,
+        )?;
+
+        Ok(())
+    }
 }
 
 /// Get column names for a schema, expanding localized columns
-fn get_column_names(schema: &TableSchema) -> Vec<String> {
+fn get_column_names(schema: &TableSchema, languages: &LanguageFilter) -> Vec<String> {
     let mut columns = Vec::new();
 
     for col in schema.columns {
         match col.col_type {
             ColumnType::Localized => {
-                for lang in LANGUAGES {
+                for lang in languages.languages() {
                     columns.push(format!("{}_{}", col.name, lang));
                 }
             }
@@ -203,9 +277,10 @@ pub fn convert_to_sqlite(
     input_dir: &Path,
     output_db: &Path,
     tables: Vec<&TableSchema>,
+    languages: &LanguageFilter,
     ui: &mut impl Ui,
 ) -> Result<u64> {
-    let mut writer = SqliteWriter::new(output_db)?;
+    let mut writer = SqliteWriter::new(output_db, languages)?;
 
     // Create all tables first
     writer.create_tables(&tables, ui)?;
@@ -213,12 +288,11 @@ pub fn convert_to_sqlite(
     let mut total_records: u64 = 0;
 
     for (i, schema) in tables.iter().enumerate() {
-        ui.log(format!(
-            "Importing table {}/{}: {}",
-            i + 1,
-            tables.len(),
-            schema.name
-        ));
+        ui.set_progress(
+            (i + 1) as u64,
+            tables.len() as u64,
+            format!("Importing: {}", schema.name),
+        );
 
         // Count lines for progress estimation
         let file_path = input_dir.join(schema.source_file);

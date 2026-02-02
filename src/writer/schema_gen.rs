@@ -1,7 +1,7 @@
-use crate::schema::{ColumnType, TableSchema, LANGUAGES};
+use crate::schema::{ColumnType, LanguageFilter, TableSchema};
 
 /// Generate CREATE TABLE SQL for a table schema
-pub fn generate_create_table(schema: &TableSchema) -> String {
+pub fn generate_create_table(schema: &TableSchema, languages: &LanguageFilter) -> String {
     let mut sql = format!("CREATE TABLE {} (\n", schema.name);
     let mut columns = Vec::new();
 
@@ -9,7 +9,7 @@ pub fn generate_create_table(schema: &TableSchema) -> String {
         match col.col_type {
             ColumnType::Localized => {
                 // Expand localized columns to per-language columns
-                for lang in LANGUAGES {
+                for lang in languages.languages() {
                     let col_name = format!("{}_{}", col.name, lang);
                     columns.push(format!("    {} TEXT", col_name));
                 }
@@ -73,7 +73,8 @@ mod tests {
 
     #[test]
     fn test_generate_create_table() {
-        let sql = generate_create_table(&TYPES);
+        let languages = LanguageFilter::all();
+        let sql = generate_create_table(&TYPES, &languages);
         assert!(sql.contains("CREATE TABLE types"));
         assert!(sql.contains("id INTEGER PRIMARY KEY"));
         assert!(sql.contains("name_en TEXT"));

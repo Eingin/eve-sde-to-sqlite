@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::schema::{ArraySource, ColumnType, TableSchema, LANGUAGES};
+use crate::schema::{ArraySource, ColumnType, LanguageFilter, TableSchema};
 
 /// A parsed row ready for insertion
 pub struct ParsedRow {
@@ -31,7 +31,11 @@ impl SqlValue {
 
 /// Parse a JSON line into rows for a junction table (tables with array_source)
 /// Returns multiple rows extracted from nested arrays
-pub fn parse_junction_records(line: &str, schema: &TableSchema) -> Result<Vec<ParsedRow>> {
+pub fn parse_junction_records(
+    line: &str,
+    schema: &TableSchema,
+    languages: &LanguageFilter,
+) -> Result<Vec<ParsedRow>> {
     let json: Value = serde_json::from_str(line).context("Failed to parse JSON")?;
 
     let array_source = schema
@@ -43,7 +47,7 @@ pub fn parse_junction_records(line: &str, schema: &TableSchema) -> Result<Vec<Pa
         ArraySource::Simple {
             array_field,
             parent_id_column,
-        } => parse_simple_array(&json, schema, array_field, parent_id_column),
+        } => parse_simple_array(&json, schema, array_field, parent_id_column, languages),
         ArraySource::SimpleIntArray {
             array_field,
             parent_id_column,
@@ -63,6 +67,7 @@ pub fn parse_junction_records(line: &str, schema: &TableSchema) -> Result<Vec<Pa
             array_field,
             parent_id_column,
             nested_key_column,
+            languages,
         ),
         ArraySource::DoubleNested {
             parent_id_column,
@@ -77,6 +82,7 @@ fn parse_simple_array(
     schema: &TableSchema,
     array_field: &str,
     parent_id_column: &str,
+    languages: &LanguageFilter,
 ) -> Result<Vec<ParsedRow>> {
     let parent_id = json
         .get("_key")
@@ -105,8 +111,16 @@ fn parse_simple_array(
                 .json_field
                 .map(String::from)
                 .unwrap_or_else(|| to_camel_case(col.name));
-            let value = extract_value(item, &json_key, &col.col_type);
-            values.insert(col.name.to_string(), value);
+
+            match col.col_type {
+                ColumnType::Localized => {
+                    extract_localized_values(item, &json_key, col.name, languages, &mut values);
+                }
+                _ => {
+                    let value = extract_value(item, &json_key, &col.col_type);
+                    values.insert(col.name.to_string(), value);
+                }
+            }
         }
 
         rows.push(ParsedRow { values });
@@ -205,6 +219,7 @@ fn parse_nested_key_value(
     array_field: &str,
     parent_id_column: &str,
     nested_key_column: &str,
+    languages: &LanguageFilter,
 ) -> Result<Vec<ParsedRow>> {
     let parent_id = json
         .get("_key")
@@ -240,9 +255,20 @@ fn parse_nested_key_value(
                     continue;
                 }
 
-                let json_key = to_camel_case(col.name);
-                let value = extract_value(item, &json_key, &col.col_type);
-                values.insert(col.name.to_string(), value);
+                let json_key = col
+                    .json_field
+                    .map(String::from)
+                    .unwrap_or_else(|| to_camel_case(col.name));
+
+                match col.col_type {
+                    ColumnType::Localized => {
+                        extract_localized_values(item, &json_key, col.name, languages, &mut values);
+                    }
+                    _ => {
+                        let value = extract_value(item, &json_key, &col.col_type);
+                        values.insert(col.name.to_string(), value);
+                    }
+                }
             }
 
             rows.push(ParsedRow { values });
@@ -310,7 +336,11 @@ fn parse_double_nested(
 }
 
 /// Parse a JSON line into a row for the given table schema
-pub fn parse_record(line: &str, schema: &TableSchema) -> Result<ParsedRow> {
+pub fn parse_record(
+    line: &str,
+    schema: &TableSchema,
+    languages: &LanguageFilter,
+) -> Result<ParsedRow> {
     let json: Value = serde_json::from_str(line).context("Failed to parse JSON")?;
 
     let mut values = HashMap::new();
@@ -320,26 +350,13 @@ pub fn parse_record(line: &str, schema: &TableSchema) -> Result<ParsedRow> {
             ColumnType::Localized => {
                 // Handle localized fields
                 let json_key = to_camel_case(col.name);
-                if let Some(obj) = json.get(&json_key).and_then(|v| v.as_object()) {
-                    for lang in LANGUAGES {
-                        let col_name = format!("{}_{}", col.name, lang);
-                        let value = obj
-                            .get(*lang)
-                            .and_then(|v| v.as_str())
-                            .map(|s| SqlValue::Text(s.to_string()))
-                            .unwrap_or(SqlValue::Null);
-                        values.insert(col_name, value);
-                    }
-                } else {
-                    for lang in LANGUAGES {
-                        let col_name = format!("{}_{}", col.name, lang);
-                        values.insert(col_name, SqlValue::Null);
-                    }
-                }
+                extract_localized_values(&json, &json_key, col.name, languages, &mut values);
             }
             _ => {
                 let json_key = if col.name == "id" {
                     "_key".to_string()
+                } else if let Some(field) = col.json_field {
+                    field.to_string()
                 } else {
                     to_camel_case(col.name)
                 };
@@ -354,10 +371,11 @@ pub fn parse_record(line: &str, schema: &TableSchema) -> Result<ParsedRow> {
 }
 
 fn extract_value(json: &Value, key: &str, col_type: &ColumnType) -> SqlValue {
-    let val = json.get(key);
+    // Support dot-notation for nested fields (e.g., "position.x")
+    let val = get_nested_value(json, key);
 
     match val {
-        None | Some(Value::Null) => SqlValue::Null,
+        None | Some(&Value::Null) => SqlValue::Null,
         Some(v) => match col_type {
             ColumnType::Integer => v.as_i64().map(SqlValue::Integer).unwrap_or(SqlValue::Null),
             ColumnType::Real => v.as_f64().map(SqlValue::Real).unwrap_or(SqlValue::Null),
@@ -372,6 +390,41 @@ fn extract_value(json: &Value, key: &str, col_type: &ColumnType) -> SqlValue {
             ColumnType::Json => SqlValue::Text(v.to_string()),
             ColumnType::Localized => SqlValue::Null, // Handled separately
         },
+    }
+}
+
+/// Get a value from JSON using dot-notation (e.g., "position.x")
+fn get_nested_value<'a>(json: &'a Value, key: &str) -> Option<&'a Value> {
+    let mut current = json;
+    for part in key.split('.') {
+        current = current.get(part)?;
+    }
+    Some(current)
+}
+
+/// Extract localized values for the filtered languages
+fn extract_localized_values(
+    json: &Value,
+    json_key: &str,
+    col_name: &str,
+    languages: &LanguageFilter,
+    values: &mut HashMap<String, SqlValue>,
+) {
+    if let Some(obj) = json.get(json_key).and_then(|v| v.as_object()) {
+        for lang in languages.languages() {
+            let column_name = format!("{}_{}", col_name, lang);
+            let value = obj
+                .get(*lang)
+                .and_then(|v| v.as_str())
+                .map(|s| SqlValue::Text(s.to_string()))
+                .unwrap_or(SqlValue::Null);
+            values.insert(column_name, value);
+        }
+    } else {
+        for lang in languages.languages() {
+            let column_name = format!("{}_{}", col_name, lang);
+            values.insert(column_name, SqlValue::Null);
+        }
     }
 }
 

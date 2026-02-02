@@ -45,6 +45,6 @@ pub fn extract_zip(zip_path: &Path, dest_dir: &Path, ui: &mut impl Ui) -> Result
         ui.set_progress((i + 1) as u64, total_files, "Extracting files");
     }
 
-    ui.log("Extraction complete");
+    ui.clear_progress();
     Ok(())
 }

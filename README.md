@@ -24,6 +24,14 @@ cargo build --release
 
 ## Usage
 
+### Global Options
+
+```bash
+# Run in quiet mode (no TUI, prints summary only)
+eve-sde-to-sqlite --quiet <command>
+eve-sde-to-sqlite -q <command>
+```
+
 ### Download and Convert (Recommended)
 
 ```bash
@@ -38,6 +46,9 @@ eve-sde-to-sqlite sync eve.db --exclude blueprints,certificates
 
 # Force re-download even if cached
 eve-sde-to-sqlite sync eve.db --force
+
+# Use a custom cache directory
+eve-sde-to-sqlite sync eve.db --cache-dir /custom/cache/path
 ```
 
 ### Convert Local Files
@@ -46,7 +57,12 @@ If you already have JSONL files extracted:
 
 ```bash
 eve-sde-to-sqlite convert /path/to/sde-jsonl eve.db
+
+# Include only specific tables (dependencies auto-resolved)
 eve-sde-to-sqlite convert /path/to/sde-jsonl eve.db --include types,groups
+
+# Exclude specific tables
+eve-sde-to-sqlite convert /path/to/sde-jsonl eve.db --exclude blueprints,certificates
 ```
 
 ### Download Only
@@ -54,6 +70,9 @@ eve-sde-to-sqlite convert /path/to/sde-jsonl eve.db --include types,groups
 ```bash
 eve-sde-to-sqlite download
 eve-sde-to-sqlite download --output /custom/path
+
+# Force re-download even if cached
+eve-sde-to-sqlite download --force
 ```
 
 ### List Available Tables
@@ -81,6 +100,44 @@ The tool supports 41 tables covering:
 | **Other** | icons, graphics, agent_types, corporation_activities, translation_languages |
 
 ## Database Schema
+
+### Views
+
+The database includes pre-built views to simplify common query patterns:
+
+#### `type_bonuses`
+
+Combines role bonuses and skill-based trait bonuses into a single queryable view. Useful for fitting tools and ship/module info displays.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `type_id` | INTEGER | The type (ship/module) ID |
+| `bonus_type` | TEXT | `'role'` for role bonuses, `'skill'` for per-level skill bonuses |
+| `skill_type_id` | INTEGER | The skill type ID (NULL for role bonuses) |
+| `skill_name` | TEXT | Skill name in English (NULL for role bonuses) |
+| `bonus` | REAL | Numeric bonus value (NULL for text-only bonuses) |
+| `bonus_text_en` | TEXT | Bonus description (may contain HTML links) |
+| `importance` | INTEGER | Display order priority |
+| `unit_id` | INTEGER | Reference to dogma_units |
+| `unit_name` | TEXT | Unit name (e.g., 'Percentage', 'Modifier') |
+| `unit_display` | TEXT | Display symbol (e.g., '%', '+') |
+
+**Example: Get all bonuses for a ship**
+
+```sql
+SELECT bonus_type, skill_name, bonus, bonus_text_en, unit_display
+FROM type_bonuses
+WHERE type_id = (SELECT id FROM types WHERE name_en = 'Sin')
+ORDER BY bonus_type DESC, skill_name, importance;
+```
+
+**Example: Get skill bonuses only**
+
+```sql
+SELECT skill_name, bonus, bonus_text_en, unit_display
+FROM type_bonuses
+WHERE type_id = 22430 AND bonus_type = 'skill';
+```
 
 ### Localized Fields
 
@@ -136,6 +193,12 @@ JOIN blueprints b ON bm.blueprint_id = b.id
 JOIN types t1 ON b.id = t1.id
 JOIN types t2 ON bm.type_id = t2.id
 WHERE t1.name_en LIKE 'Rifter%' AND bm.activity = 'manufacturing';
+
+-- Get all bonuses for a ship (using the type_bonuses view)
+SELECT bonus_type, skill_name, bonus, bonus_text_en, unit_display
+FROM type_bonuses
+WHERE type_id = (SELECT id FROM types WHERE name_en = 'Sin')
+ORDER BY bonus_type DESC, skill_name, importance;
 ```
 
 ## Cache Location

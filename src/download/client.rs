@@ -79,7 +79,7 @@ impl SdeClient {
             ui.set_progress(downloaded, total_size, format_bytes(downloaded, total_size));
         }
 
-        ui.log("Download complete");
+        ui.clear_progress();
         Ok(())
     }
 }

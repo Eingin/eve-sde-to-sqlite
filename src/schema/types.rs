@@ -1,7 +1,52 @@
 use std::collections::HashSet;
 
-/// Supported languages for localized text
-pub const LANGUAGES: &[&str] = &["en", "de", "es", "fr", "ja", "ko", "ru", "zh"];
+/// All supported languages for localized text
+pub const ALL_LANGUAGES: &[&str] = &["en", "de", "es", "fr", "ja", "ko", "ru", "zh"];
+
+/// Language filter for selecting which localized columns to include
+#[derive(Debug, Clone)]
+pub struct LanguageFilter {
+    languages: Vec<&'static str>,
+}
+
+impl LanguageFilter {
+    /// Create a filter for specific languages
+    pub fn new(languages: Vec<String>) -> anyhow::Result<Self> {
+        let mut result = Vec::new();
+        for lang in languages {
+            match ALL_LANGUAGES.iter().find(|&&l| l == lang) {
+                Some(&l) => result.push(l),
+                None => anyhow::bail!(
+                    "Unknown language: '{}'. Valid languages: {}",
+                    lang,
+                    ALL_LANGUAGES.join(", ")
+                ),
+            }
+        }
+        if result.is_empty() {
+            anyhow::bail!("At least one language must be specified");
+        }
+        Ok(Self { languages: result })
+    }
+
+    /// Create a filter that includes all languages
+    pub fn all() -> Self {
+        Self {
+            languages: ALL_LANGUAGES.to_vec(),
+        }
+    }
+
+    /// Get the list of languages to include
+    pub fn languages(&self) -> &[&'static str] {
+        &self.languages
+    }
+}
+
+impl Default for LanguageFilter {
+    fn default() -> Self {
+        Self::all()
+    }
+}
 
 /// Column data type
 #[derive(Debug, Clone, PartialEq)]

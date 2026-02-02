@@ -22,14 +22,10 @@ pub fn ensure_sde_downloaded(
 
     // Get latest build info
     ui.set_phase(Phase::Checking);
-    ui.log("Checking for latest SDE version...");
+    ui.set_info("Checking for latest SDE version...");
     let info = client.fetch_latest_info()?;
     ui.set_info(format!(
         "Build {} ({})",
-        info.build_number, info.release_date
-    ));
-    ui.log(format!(
-        "Latest build: {} ({})",
         info.build_number, info.release_date
     ));
 
@@ -37,19 +33,19 @@ pub fn ensure_sde_downloaded(
 
     // Check if already cached
     if !force && cache.is_cached(info.build_number) {
-        ui.log(format!("Using cached SDE from {:?}", build_dir));
+        ui.set_info(format!("Using cached SDE from {:?}", build_dir));
         return Ok((build_dir, info.build_number));
     }
 
     // Download zip
     ui.set_phase(Phase::Downloading);
     let zip_path = cache.zip_path(info.build_number);
-    ui.log(format!("Downloading SDE build {}...", info.build_number));
+    ui.set_info(format!("Downloading SDE build {}...", info.build_number));
     client.download_zip(&zip_path, ui)?;
 
     // Extract zip
     ui.set_phase(Phase::Extracting);
-    ui.log(format!("Extracting to {:?}...", build_dir));
+    ui.set_info(format!("Extracting to {:?}...", build_dir));
     extract_zip(&zip_path, &build_dir, ui)?;
 
     // Clean up zip file

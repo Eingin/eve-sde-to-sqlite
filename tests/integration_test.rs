@@ -23,6 +23,7 @@ use std::sync::Mutex;
 use tempfile::NamedTempFile;
 
 use eve_sde_to_sqlite::schema::tables::ALL_TABLES;
+use eve_sde_to_sqlite::schema::LanguageFilter;
 use eve_sde_to_sqlite::ui::SilentUi;
 use eve_sde_to_sqlite::writer::convert_to_sqlite;
 
@@ -67,7 +68,8 @@ impl TestDatabase {
         let tables: Vec<_> = ALL_TABLES.iter().copied().collect();
         let mut ui = SilentUi::new();
 
-        convert_to_sqlite(&jsonl_dir, &db_path, tables, &mut ui)
+        let languages = LanguageFilter::all();
+        convert_to_sqlite(&jsonl_dir, &db_path, tables, &languages, &mut ui)
             .expect("Failed to convert JSONL to SQLite");
 
         Self {
@@ -816,7 +818,16 @@ regular_table_test!(
     "planet_resources",
     "planetResources.jsonl",
     "id",
-    &[("id", FieldType::Integer), ("power", FieldType::Integer)]
+    &[
+        ("id", FieldType::Integer),
+        ("power", FieldType::Integer),
+        ("workforce", FieldType::Integer),
+        ("reagent_type_id", FieldType::Integer),
+        ("reagent_amount_per_cycle", FieldType::Integer),
+        ("reagent_cycle_period", FieldType::Integer),
+        ("reagent_secured_capacity", FieldType::Integer),
+        ("reagent_unsecured_capacity", FieldType::Integer),
+    ]
 );
 
 regular_table_test!(

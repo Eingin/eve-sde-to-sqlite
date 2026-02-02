@@ -3,7 +3,7 @@ use eve_sde_to_sqlite::{
     cli::{Cli, Commands},
     download::ensure_sde_downloaded,
     filter::resolve_tables,
-    schema::table_names,
+    schema::{table_names, LanguageFilter},
     ui::{Phase, SilentUi, Ui, UiApp},
     writer::convert_to_sqlite,
 };
@@ -17,12 +17,25 @@ fn main() -> Result<()> {
             output_db,
             include,
             exclude,
+            languages,
             force,
             cache_dir,
         } => {
+            let lang_filter = match languages {
+                Some(langs) => LanguageFilter::new(langs)?,
+                None => LanguageFilter::all(),
+            };
             if cli.quiet {
                 let mut ui = SilentUi::new();
-                run_sync(&mut ui, output_db, include, exclude, force, cache_dir)?;
+                run_sync(
+                    &mut ui,
+                    output_db,
+                    include,
+                    exclude,
+                    &lang_filter,
+                    force,
+                    cache_dir,
+                )?;
             } else {
                 let mut ui = UiApp::new()?;
                 run_sync(
@@ -30,6 +43,7 @@ fn main() -> Result<()> {
                     output_db.clone(),
                     include,
                     exclude,
+                    &lang_filter,
                     force,
                     cache_dir,
                 )?;
@@ -53,10 +67,22 @@ fn main() -> Result<()> {
             output_db,
             include,
             exclude,
+            languages,
         } => {
+            let lang_filter = match languages {
+                Some(langs) => LanguageFilter::new(langs)?,
+                None => LanguageFilter::all(),
+            };
             if cli.quiet {
                 let mut ui = SilentUi::new();
-                run_convert(&mut ui, input_dir, output_db, include, exclude)?;
+                run_convert(
+                    &mut ui,
+                    input_dir,
+                    output_db,
+                    include,
+                    exclude,
+                    &lang_filter,
+                )?;
             } else {
                 let mut ui = UiApp::new()?;
                 run_convert(
@@ -65,6 +91,7 @@ fn main() -> Result<()> {
                     output_db.clone(),
                     include,
                     exclude,
+                    &lang_filter,
                 )?;
                 ui.finish("Complete")?;
             }
@@ -86,6 +113,7 @@ fn run_sync(
     output_db: std::path::PathBuf,
     include: Option<Vec<String>>,
     exclude: Option<Vec<String>>,
+    languages: &LanguageFilter,
     force: bool,
     cache_dir: Option<std::path::PathBuf>,
 ) -> Result<()> {
@@ -96,12 +124,11 @@ fn run_sync(
 
     // Resolve table filters
     let tables = resolve_tables(include, exclude)?;
-    ui.log(format!("Selected {} tables for import", tables.len()));
+    ui.set_info(format!("Selected {} tables for import", tables.len()));
 
     // Convert to SQLite
     ui.set_phase(Phase::Converting);
-    ui.log("Converting to SQLite...");
-    let record_count = convert_to_sqlite(&input_dir, &output_db, tables, ui)?;
+    let record_count = convert_to_sqlite(&input_dir, &output_db, tables, languages, ui)?;
 
     let elapsed = start.elapsed();
     let summary = format!(
@@ -111,7 +138,6 @@ fn run_sync(
         build_number,
         elapsed.as_secs_f64()
     );
-    ui.log(&summary);
     println!("{}", summary);
 
     Ok(())
@@ -119,9 +145,7 @@ fn run_sync(
 
 fn run_download(ui: &mut impl Ui, output: Option<std::path::PathBuf>, force: bool) -> Result<()> {
     let (path, build_number) = ensure_sde_downloaded(output, force, ui)?;
-    let summary = format!("SDE build {} downloaded to {:?}", build_number, path);
-    ui.log(&summary);
-    println!("{}", summary);
+    println!("SDE build {} downloaded to {:?}", build_number, path);
 
     Ok(())
 }
@@ -132,28 +156,25 @@ fn run_convert(
     output_db: std::path::PathBuf,
     include: Option<Vec<String>>,
     exclude: Option<Vec<String>>,
+    languages: &LanguageFilter,
 ) -> Result<()> {
     let start = Instant::now();
 
     // Resolve table filters
     let tables = resolve_tables(include, exclude)?;
-    ui.log(format!("Selected {} tables for import", tables.len()));
+    ui.set_info(format!("Selected {} tables for import", tables.len()));
 
     // Convert to SQLite
     ui.set_phase(Phase::Converting);
-    ui.set_info(format!("Output: {:?}", output_db));
-    ui.log("Converting to SQLite...");
-    let record_count = convert_to_sqlite(&input_dir, &output_db, tables, ui)?;
+    let record_count = convert_to_sqlite(&input_dir, &output_db, tables, languages, ui)?;
 
     let elapsed = start.elapsed();
-    let summary = format!(
+    println!(
         "Created {:?} ({} records) in {:.1}s",
         output_db,
         record_count,
         elapsed.as_secs_f64()
     );
-    ui.log(&summary);
-    println!("{}", summary);
 
     Ok(())
 }

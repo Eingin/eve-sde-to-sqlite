@@ -28,6 +28,11 @@ pub enum Commands {
         #[arg(short, long, value_delimiter = ',')]
         exclude: Option<Vec<String>>,
 
+        /// Languages to include for localized text (default: all)
+        /// Example: --languages en,de or --languages en
+        #[arg(short, long, value_delimiter = ',')]
+        languages: Option<Vec<String>>,
+
         /// Force re-download even if cached
         #[arg(short, long)]
         force: bool,
@@ -63,6 +68,11 @@ pub enum Commands {
         /// Exclude these tables (comma-separated)
         #[arg(short, long, value_delimiter = ',')]
         exclude: Option<Vec<String>>,
+
+        /// Languages to include for localized text (default: all)
+        /// Example: --languages en,de or --languages en
+        #[arg(short, long, value_delimiter = ',')]
+        languages: Option<Vec<String>>,
     },
 
     /// List all available table names
