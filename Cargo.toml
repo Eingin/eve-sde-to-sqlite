@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Convert EVE Online Static Data Export (SDE) to SQLite database"
 license = "MIT"
-repository = "https://github.com/yourusername/eve-sde-to-sqlite"
+repository = "https://github.com/Eingin/eve-sde-to-sqlite"
 keywords = ["eve-online", "sqlite", "sde", "game-data"]
 categories = ["command-line-utilities", "database"]
 

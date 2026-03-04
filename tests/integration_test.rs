@@ -7,7 +7,7 @@
 //!
 //! Run with:
 //! ```sh
-//! EVE_SDE_TEST_DATA=/path/to/jsonl cargo test --test integration_test -- --ignored
+//! EVE_SDE_TEST_DATA=/path/to/jsonl cargo test --test integration_test
 //! ```
 
 use once_cell::sync::Lazy;
@@ -310,7 +310,7 @@ regular_table_test!(
     &[
         ("id", FieldType::Integer),
         ("name", FieldType::Text),
-        ("display_name", FieldType::Text),
+        ("display_name_en", FieldType::LocalizedEn),
     ]
 );
 
@@ -319,11 +319,7 @@ regular_table_test!(
     "icons",
     "icons.jsonl",
     "id",
-    &[
-        ("id", FieldType::Integer),
-        ("description", FieldType::Text),
-        ("icon_file", FieldType::Text),
-    ]
+    &[("id", FieldType::Integer), ("icon_file", FieldType::Text),]
 );
 
 regular_table_test!(
@@ -333,7 +329,6 @@ regular_table_test!(
     "id",
     &[
         ("id", FieldType::Integer),
-        ("description", FieldType::Text),
         ("graphic_file", FieldType::Text),
     ]
 );
@@ -353,7 +348,7 @@ regular_table_test!(
     "id",
     &[
         ("id", FieldType::Integer),
-        ("service_name", FieldType::Text),
+        ("service_name_en", FieldType::LocalizedEn),
     ]
 );
 
@@ -474,7 +469,7 @@ regular_table_test!(
     &[
         ("id", FieldType::Integer),
         ("name", FieldType::Text),
-        ("effect_category", FieldType::Integer),
+        ("effect_category_id", FieldType::Integer),
         ("published", FieldType::Boolean),
     ]
 );
@@ -487,7 +482,7 @@ regular_table_test!(
     &[
         ("id", FieldType::Integer),
         ("name_en", FieldType::LocalizedEn),
-        ("center_x", FieldType::Real),
+        ("faction_id", FieldType::Integer),
     ]
 );
 
@@ -698,7 +693,7 @@ regular_table_test!(
     &[
         ("id", FieldType::Integer),
         ("solar_system_id", FieldType::Integer),
-        ("planet_id", FieldType::Integer),
+        ("orbit_id", FieldType::Integer),
         ("type_id", FieldType::Integer),
     ]
 );
@@ -711,7 +706,7 @@ regular_table_test!(
     &[
         ("id", FieldType::Integer),
         ("solar_system_id", FieldType::Integer),
-        ("planet_id", FieldType::Integer),
+        ("orbit_id", FieldType::Integer),
     ]
 );
 
@@ -784,7 +779,6 @@ regular_table_test!(
     &[
         ("id", FieldType::Integer),
         ("name_en", FieldType::LocalizedEn),
-        ("importance", FieldType::Integer),
     ]
 );
 
@@ -1716,6 +1710,191 @@ fn test_dbuff_location_group_modifiers() {
                 "Missing location group modifier in DB: collection_id={}, dogma_attribute_id={}, group_id={}",
                 collection_id, dogma_attr_id, group_id
             );
+        }
+    }
+}
+
+#[test]
+
+fn test_dbuff_location_required_skill_modifiers() {
+    let db = get_test_db();
+    let jsonl_path = get_jsonl_path("dbuffCollections.jsonl");
+
+    if !jsonl_path.exists() {
+        println!("Skipping dbuffCollections.jsonl - file not found");
+        return;
+    }
+
+    let samples = sample_jsonl_lines(&jsonl_path, SAMPLE_SIZE);
+
+    for json_line in samples {
+        let json: Value = serde_json::from_str(&json_line).expect("Failed to parse JSON");
+        let collection_id = json["_key"].as_i64().expect("Missing _key");
+
+        let modifiers = match json["locationRequiredSkillModifiers"].as_array() {
+            Some(arr) => arr,
+            None => continue,
+        };
+
+        let sql = "SELECT dogma_attribute_id, skill_id FROM dbuff_location_required_skill_modifiers WHERE collection_id = ?";
+        let mut stmt = db.prepare(sql).expect("Failed to prepare statement");
+
+        let db_rows: Vec<(i64, i64)> = stmt
+            .query_map([collection_id], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })
+            .expect("Query failed")
+            .filter_map(|r| r.ok())
+            .collect();
+
+        for modifier in modifiers {
+            let dogma_attr_id = modifier["dogmaAttributeID"]
+                .as_i64()
+                .expect("Missing dogmaAttributeID");
+            let skill_id = modifier["skillID"].as_i64().expect("Missing skillID");
+
+            let found = db_rows
+                .iter()
+                .any(|(a, s)| *a == dogma_attr_id && *s == skill_id);
+
+            assert!(
+                found,
+                "Missing location required skill modifier in DB: collection_id={}, dogma_attribute_id={}, skill_id={}",
+                collection_id, dogma_attr_id, skill_id
+            );
+        }
+    }
+}
+
+#[test]
+
+fn test_dogma_modifier_info() {
+    let db = get_test_db();
+    let jsonl_path = get_jsonl_path("dogmaEffects.jsonl");
+
+    if !jsonl_path.exists() {
+        println!("Skipping dogmaEffects.jsonl - file not found");
+        return;
+    }
+
+    let samples = sample_jsonl_lines(&jsonl_path, SAMPLE_SIZE);
+
+    for json_line in samples {
+        let json: Value = serde_json::from_str(&json_line).expect("Failed to parse JSON");
+        let effect_id = json["_key"].as_i64().expect("Missing _key");
+
+        let modifiers = match json["modifierInfo"].as_array() {
+            Some(arr) => arr,
+            None => continue,
+        };
+
+        let sql = "SELECT domain, func, modified_attribute_id, modifying_attribute_id, operation, group_id, skill_type_id FROM dogma_modifier_info WHERE effect_id = ?";
+        let mut stmt = db.prepare(sql).expect("Failed to prepare statement");
+
+        let db_rows: Vec<(
+            String,
+            String,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+        )> = stmt
+            .query_map([effect_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<i64>>(2)?,
+                    row.get::<_, Option<i64>>(3)?,
+                    row.get::<_, Option<i64>>(4)?,
+                    row.get::<_, Option<i64>>(5)?,
+                    row.get::<_, Option<i64>>(6)?,
+                ))
+            })
+            .expect("Query failed")
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert_eq!(
+            modifiers.len(),
+            db_rows.len(),
+            "Row count mismatch for effect_id={}: JSON has {}, DB has {}",
+            effect_id,
+            modifiers.len(),
+            db_rows.len()
+        );
+
+        for modifier in modifiers {
+            let domain = modifier["domain"].as_str().expect("Missing domain");
+            let func = modifier["func"].as_str().expect("Missing func");
+
+            let found = db_rows
+                .iter()
+                .any(|(d, f, _, _, _, _, _)| d == domain && f == func);
+
+            assert!(
+                found,
+                "Missing modifier in DB: effect_id={}, domain={}, func={}",
+                effect_id, domain, func
+            );
+        }
+    }
+}
+
+#[test]
+
+fn test_dynamic_item_mappings() {
+    let db = get_test_db();
+    let jsonl_path = get_jsonl_path("dynamicItemAttributes.jsonl");
+
+    if !jsonl_path.exists() {
+        println!("Skipping dynamicItemAttributes.jsonl - file not found");
+        return;
+    }
+
+    let samples = sample_jsonl_lines(&jsonl_path, SAMPLE_SIZE);
+
+    for json_line in samples {
+        let json: Value = serde_json::from_str(&json_line).expect("Failed to parse JSON");
+        let type_id = json["_key"].as_i64().expect("Missing _key");
+
+        let mappings = match json["inputOutputMapping"].as_array() {
+            Some(arr) => arr,
+            None => continue,
+        };
+
+        let sql = "SELECT resulting_type_id, applicable_type_id FROM dynamic_item_mappings WHERE mutaplasmid_type_id = ?";
+        let mut stmt = db.prepare(sql).expect("Failed to prepare statement");
+
+        let db_rows: Vec<(i64, i64)> = stmt
+            .query_map([type_id], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })
+            .expect("Query failed")
+            .filter_map(|r| r.ok())
+            .collect();
+
+        for mapping in mappings {
+            let resulting_type = mapping["resultingType"]
+                .as_i64()
+                .expect("Missing resultingType");
+            let applicable_types = mapping["applicableTypes"]
+                .as_array()
+                .expect("Missing applicableTypes");
+
+            for applicable in applicable_types {
+                let applicable_id = applicable.as_i64().expect("Not an integer");
+
+                let found = db_rows
+                    .iter()
+                    .any(|(r, a)| *r == resulting_type && *a == applicable_id);
+
+                assert!(
+                    found,
+                    "Missing mapping in DB: mutaplasmid_type_id={}, resulting_type_id={}, applicable_type_id={}",
+                    type_id, resulting_type, applicable_id
+                );
+            }
         }
     }
 }

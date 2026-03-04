@@ -135,14 +135,6 @@ impl Index {
             unique: false,
         }
     }
-
-    /// Create a unique index
-    pub const fn unique(columns: &'static [&'static str]) -> Self {
-        Self {
-            columns,
-            unique: true,
-        }
-    }
 }
 
 /// Describes how to extract rows from nested arrays in JSONL
@@ -186,6 +178,23 @@ pub enum ArraySource {
         parent_id_column: &'static str,
         /// Column to store the first-level _key (e.g., "mastery_level")
         level_key_column: &'static str,
+    },
+    /// Array of objects each containing a sub-array of integers to fan out.
+    /// `{"_key": X, "field": [{"keyField": Y, "valuesField": [Z1, Z2, ...]}, ...]}`
+    /// Produces one row per integer: (parent_key=X, key=Y, value=Z)
+    NestedFanOut {
+        /// JSON field containing the outer array (e.g., "inputOutputMapping")
+        array_field: &'static str,
+        /// Column to store the parent's _key value (e.g., "mutaplasmid_type_id")
+        parent_id_column: &'static str,
+        /// JSON field in each object for the scalar key (e.g., "resultingType")
+        key_field: &'static str,
+        /// Column to store the scalar key (e.g., "resulting_type_id")
+        key_column: &'static str,
+        /// JSON field in each object for the integer sub-array (e.g., "applicableTypes")
+        values_field: &'static str,
+        /// Column to store each integer from the sub-array (e.g., "applicable_type_id")
+        value_column: &'static str,
     },
 }
 

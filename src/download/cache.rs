@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct CacheManager {
     cache_dir: PathBuf,
@@ -21,11 +21,6 @@ impl CacheManager {
         fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
 
         Ok(Self { cache_dir })
-    }
-
-    /// Get the cache directory path
-    pub fn cache_dir(&self) -> &Path {
-        &self.cache_dir
     }
 
     /// Get path to build-specific directory

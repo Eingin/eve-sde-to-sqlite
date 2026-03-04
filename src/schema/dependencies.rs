@@ -6,26 +6,17 @@ use std::collections::{HashMap, HashSet, VecDeque};
 pub struct DependencyResolver {
     /// Map of table name -> tables it depends on
     deps: HashMap<&'static str, HashSet<&'static str>>,
-    /// Map of table name -> tables that depend on it (reserved for future use)
-    #[allow(dead_code)]
-    reverse_deps: HashMap<&'static str, HashSet<&'static str>>,
 }
 
 impl DependencyResolver {
     pub fn new() -> Self {
         let mut deps: HashMap<&'static str, HashSet<&'static str>> = HashMap::new();
-        let mut reverse_deps: HashMap<&'static str, HashSet<&'static str>> = HashMap::new();
 
         for table in ALL_TABLES {
-            let table_deps = table.dependencies();
-            deps.insert(table.name, table_deps.clone());
-
-            for dep in table_deps {
-                reverse_deps.entry(dep).or_default().insert(table.name);
-            }
+            deps.insert(table.name, table.dependencies());
         }
 
-        Self { deps, reverse_deps }
+        Self { deps }
     }
 
     /// Given a set of requested tables, resolve all required dependencies

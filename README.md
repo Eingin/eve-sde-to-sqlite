@@ -15,7 +15,7 @@ A fast CLI tool to download and convert EVE Online's Static Data Export (SDE) to
 
 ```bash
 # Clone and build
-git clone https://github.com/youruser/eve-sde-to-sqlite
+git clone https://github.com/Eingin/eve-sde-to-sqlite
 cd eve-sde-to-sqlite
 cargo build --release
 
@@ -83,21 +83,26 @@ eve-sde-to-sqlite list-tables
 
 ## Available Tables
 
-The tool supports 41 tables covering:
+The tool supports 68 tables covering:
 
 | Category | Tables |
 |----------|--------|
-| **Core** | categories, groups, types, meta_groups |
+| **Core** | categories, groups, types, meta_groups, compressible_types |
 | **Market** | market_groups |
 | **Industry** | blueprints, blueprint_materials, blueprint_products, blueprint_skills |
-| **Dogma** | dogma_attributes, dogma_effects, dogma_units, dogma_attribute_categories, type_dogma_attributes |
+| **Dogma** | dogma_attributes, dogma_effects, dogma_modifier_info, dogma_units, dogma_attribute_categories, type_dogma_attributes, type_dogma_effects |
+| **Dbuffs** | dbuff_collections, dbuff_item_modifiers, dbuff_location_modifiers, dbuff_location_group_modifiers, dbuff_location_required_skill_modifiers |
+| **Mutaplasmids** | dynamic_item_attributes, dynamic_item_mappings |
 | **Materials** | type_materials |
-| **NPCs** | factions, npc_corporations, races, bloodlines, ancestries |
-| **Characters** | character_attributes, certificates |
-| **Map** | map_regions, map_constellations, map_solar_systems, map_stars, map_planets, map_moons, map_asteroid_belts, map_stargates |
-| **Stations** | npc_stations, station_operations, station_services |
+| **NPCs** | factions, npc_corporations, npc_characters, npc_corporation_divisions, races, bloodlines, ancestries |
+| **Characters** | character_attributes, certificates, clone_grades, clone_grade_skills |
+| **Map** | map_regions, map_constellations, map_solar_systems, map_stars, map_planets, map_moons, map_asteroid_belts, map_stargates, landmarks |
+| **Stations** | npc_stations, station_operations, station_services, agents_in_space, agent_types |
+| **Sovereignty** | sovereignty_upgrades |
+| **Planetary** | planet_resources, planet_schematics, planet_schematic_types, planet_schematic_pins |
 | **Skins** | skins, skin_licenses, skin_materials |
-| **Other** | icons, graphics, agent_types, corporation_activities, translation_languages |
+| **Traits** | type_role_bonuses, type_trait_bonuses, type_masteries |
+| **Other** | icons, graphics, corporation_activities, contraband_type_factions, control_tower_resources, translation_languages, freelance_job_schemas |
 
 ## Database Schema
 
@@ -222,7 +227,7 @@ cargo test
 Integration tests (require JSONL test data):
 ```bash
 # Download and extract SDE first, then:
-EVE_SDE_TEST_DATA=/path/to/jsonl-files cargo test --test integration_test -- --ignored
+EVE_SDE_TEST_DATA=/path/to/jsonl-files cargo test --test integration_test
 ```
 
 ### Building

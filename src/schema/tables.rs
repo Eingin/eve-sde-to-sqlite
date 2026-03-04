@@ -321,11 +321,14 @@ pub static DOGMA_ATTRIBUTES: TableSchema = TableSchema {
         Column::new("tooltip_title", ColumnType::Localized),
         Column::new("tooltip_description", ColumnType::Localized),
         Column::new("attribute_category_id", ColumnType::Integer),
+        Column::new("charge_recharge_time_id", ColumnType::Integer),
         Column::new("data_type", ColumnType::Integer),
         Column::new("default_value", ColumnType::Real),
         Column::new("display_when_zero", ColumnType::Boolean),
         Column::new("high_is_good", ColumnType::Boolean),
         Column::new("icon_id", ColumnType::Integer),
+        Column::new("max_attribute_id", ColumnType::Integer),
+        Column::new("min_attribute_id", ColumnType::Integer),
         Column::new("published", ColumnType::Boolean),
         Column::new("stackable", ColumnType::Boolean),
         Column::new("unit_id", ColumnType::Integer),
@@ -350,6 +353,7 @@ pub static DOGMA_EFFECTS: TableSchema = TableSchema {
     columns: &[
         Column::required("id", ColumnType::Integer),
         Column::new("name", ColumnType::Text),
+        Column::new("description", ColumnType::Localized),
         Column::new("display_name", ColumnType::Localized),
         Column::new("effect_category_id", ColumnType::Integer),
         Column::new("guid", ColumnType::Text),
@@ -369,6 +373,8 @@ pub static DOGMA_EFFECTS: TableSchema = TableSchema {
         Column::new("range_attribute_id", ColumnType::Integer),
         Column::new("tracking_speed_attribute_id", ColumnType::Integer),
         Column::new("fitting_usage_chance_attribute_id", ColumnType::Integer),
+        Column::new("npc_activation_chance_attribute_id", ColumnType::Integer),
+        Column::new("npc_usage_chance_attribute_id", ColumnType::Integer),
         Column::new("resistance_attribute_id", ColumnType::Integer),
     ],
     foreign_keys: &[ForeignKey::new("icon_id", "icons")],
@@ -376,8 +382,10 @@ pub static DOGMA_EFFECTS: TableSchema = TableSchema {
         Index::on(&["icon_id"]),
         Index::on(&["name"]),
         Index::on(&["published"]),
+        Index::on(&["effect_category_id"]),
+        Index::on(&["guid"]),
     ],
-    child_tables: &[],
+    child_tables: &["dogma_modifier_info"],
     array_source: None,
 };
 
@@ -749,6 +757,9 @@ pub static MAP_SOLAR_SYSTEMS: TableSchema = TableSchema {
         Column::new("position_x", ColumnType::Real).json("position.x"),
         Column::new("position_y", ColumnType::Real).json("position.y"),
         Column::new("position_z", ColumnType::Real).json("position.z"),
+        // 2D schematic map coordinates (used for in-game 2D map)
+        Column::new("position_2d_x", ColumnType::Real).json("position2D.x"),
+        Column::new("position_2d_y", ColumnType::Real).json("position2D.y"),
     ],
     foreign_keys: &[
         ForeignKey::new("constellation_id", "map_constellations"),
@@ -1303,9 +1314,6 @@ pub static TYPE_ROLE_BONUSES: TableSchema = TableSchema {
 
 /// Trait bonuses for types based on skills (from typeBonus.jsonl types array)
 /// Format: {"_key": 582, "types": [{"_key": 3330, "_value": [{"bonus": 10.0, "bonusText": {...}, ...}]}]}
-/// NOTE: Requires special parser handling - the "types" array contains objects with _key (skill type)
-/// and _value (array of bonuses). Each bonus row needs type_id (parent _key), skill_type_id (nested _key),
-/// and the bonus fields.
 pub static TYPE_TRAIT_BONUSES: TableSchema = TableSchema {
     name: "type_trait_bonuses",
     source_file: "typeBonus.jsonl",
@@ -1333,10 +1341,6 @@ pub static TYPE_TRAIT_BONUSES: TableSchema = TableSchema {
 
 /// Mastery requirements for types (from masteries.jsonl)
 /// Format: {"_key": 582, "_value": [{"_key": 0, "_value": [96, 139, 85, 87, 94]}, {"_key": 1, "_value": [...]}]}
-/// NOTE: Requires special parser handling - double-nested structure where:
-/// - Parent _key is the type_id
-/// - First level _key (0-4) is the mastery_level
-/// - Inner _value array contains certificate_ids
 pub static TYPE_MASTERIES: TableSchema = TableSchema {
     name: "type_masteries",
     source_file: "masteries.jsonl",
@@ -1370,13 +1374,17 @@ pub static DBUFF_COLLECTIONS: TableSchema = TableSchema {
         Column::required("id", ColumnType::Integer),
         Column::new("aggregate_mode", ColumnType::Text),
         Column::new("developer_description", ColumnType::Text),
+        Column::new("display_name", ColumnType::Localized),
+        Column::new("operation_name", ColumnType::Text),
+        Column::new("show_output_value_in_ui", ColumnType::Text).json("showOutputValueInUI"),
     ],
     foreign_keys: &[],
-    indexes: &[],
+    indexes: &[Index::on(&["operation_name"])],
     child_tables: &[
         "dbuff_item_modifiers",
         "dbuff_location_modifiers",
         "dbuff_location_group_modifiers",
+        "dbuff_location_required_skill_modifiers",
     ],
     array_source: None,
 };
@@ -1456,20 +1464,117 @@ pub static DBUFF_LOCATION_GROUP_MODIFIERS: TableSchema = TableSchema {
     }),
 };
 
+/// Dbuff location required skill modifiers junction table
+/// Format: {"_key": 1, "locationRequiredSkillModifiers": [{"dogmaAttributeID": 6, "skillID": 3427}, ...]}
+pub static DBUFF_LOCATION_REQUIRED_SKILL_MODIFIERS: TableSchema = TableSchema {
+    name: "dbuff_location_required_skill_modifiers",
+    source_file: "dbuffCollections.jsonl",
+    columns: &[
+        Column::required("collection_id", ColumnType::Integer),
+        Column::required("dogma_attribute_id", ColumnType::Integer).json("dogmaAttributeID"),
+        Column::required("skill_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("collection_id", "dbuff_collections"),
+        ForeignKey::new("dogma_attribute_id", "dogma_attributes"),
+        ForeignKey::new("skill_id", "types"),
+    ],
+    indexes: &[
+        Index::on(&["collection_id"]),
+        Index::on(&["dogma_attribute_id"]),
+        Index::on(&["skill_id"]),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "locationRequiredSkillModifiers",
+        parent_id_column: "collection_id",
+    }),
+};
+
+// =============================================================================
+// Dogma Modifier Info (effect modifier expressions)
+// =============================================================================
+
+/// Dogma modifier info — normalized from modifierInfo arrays in dogmaEffects.jsonl.
+/// Each row describes one attribute modification that an effect performs.
+pub static DOGMA_MODIFIER_INFO: TableSchema = TableSchema {
+    name: "dogma_modifier_info",
+    source_file: "dogmaEffects.jsonl",
+    columns: &[
+        Column::required("effect_id", ColumnType::Integer),
+        Column::required("domain", ColumnType::Text),
+        Column::required("func", ColumnType::Text),
+        Column::new("modified_attribute_id", ColumnType::Integer),
+        Column::new("modifying_attribute_id", ColumnType::Integer),
+        Column::new("operation", ColumnType::Integer),
+        Column::new("group_id", ColumnType::Integer),
+        Column::new("skill_type_id", ColumnType::Integer),
+        Column::new("modifier_effect_id", ColumnType::Integer).json("effectID"),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("effect_id", "dogma_effects"),
+        ForeignKey::new("modified_attribute_id", "dogma_attributes"),
+        ForeignKey::new("modifying_attribute_id", "dogma_attributes"),
+    ],
+    indexes: &[
+        Index::on(&["effect_id"]),
+        Index::on(&["modified_attribute_id"]),
+        Index::on(&["modifying_attribute_id"]),
+        Index::on(&["func"]),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::Simple {
+        array_field: "modifierInfo",
+        parent_id_column: "effect_id",
+    }),
+};
+
+// =============================================================================
+// Dynamic Item Mappings (mutaplasmid input/output)
+// =============================================================================
+
+/// Maps mutaplasmid type -> resulting abyssal type -> applicable input types.
+/// Extracted from inputOutputMapping arrays in dynamicItemAttributes.jsonl.
+pub static DYNAMIC_ITEM_MAPPINGS: TableSchema = TableSchema {
+    name: "dynamic_item_mappings",
+    source_file: "dynamicItemAttributes.jsonl",
+    columns: &[
+        Column::required("mutaplasmid_type_id", ColumnType::Integer),
+        Column::required("resulting_type_id", ColumnType::Integer),
+        Column::required("applicable_type_id", ColumnType::Integer),
+    ],
+    foreign_keys: &[
+        ForeignKey::new("mutaplasmid_type_id", "types"),
+        ForeignKey::new("resulting_type_id", "types"),
+        ForeignKey::new("applicable_type_id", "types"),
+    ],
+    indexes: &[
+        Index::on(&["mutaplasmid_type_id"]),
+        Index::on(&["resulting_type_id"]),
+        Index::on(&["applicable_type_id"]),
+    ],
+    child_tables: &[],
+    array_source: Some(ArraySource::NestedFanOut {
+        array_field: "inputOutputMapping",
+        parent_id_column: "mutaplasmid_type_id",
+        key_field: "resultingType",
+        key_column: "resulting_type_id",
+        values_field: "applicableTypes",
+        value_column: "applicable_type_id",
+    }),
+};
+
 // =============================================================================
 // Freelance Job Schemas (complex nested structure - simplified for now)
 // =============================================================================
 
 /// Freelance job schemas - simplified table (complex nested localized content)
 /// Full structure has deeply nested localized content that may need custom handling
+/// Freelance job schemas — only ID extracted; remaining fields are deeply nested localized content.
 pub static FREELANCE_JOB_SCHEMAS: TableSchema = TableSchema {
     name: "freelance_job_schemas",
     source_file: "freelanceJobSchemas.jsonl",
-    columns: &[
-        Column::required("id", ColumnType::Integer),
-        // TODO: Expand with more columns as needed - structure is complex with
-        // deeply nested localized content
-    ],
+    columns: &[Column::required("id", ColumnType::Integer)],
     foreign_keys: &[],
     indexes: &[],
     child_tables: &[],
@@ -1549,11 +1654,14 @@ pub static ALL_TABLES: &[&TableSchema] = &[
     &PLANET_SCHEMATIC_TYPES,
     // Wave 7: Complex nested junction tables (require special parser handling)
     &TYPE_ROLE_BONUSES,
-    &TYPE_TRAIT_BONUSES, // NOTE: Requires NestedKeyValue parser support
-    &TYPE_MASTERIES,     // NOTE: Requires DoubleNested parser support
+    &TYPE_TRAIT_BONUSES,
+    &TYPE_MASTERIES,
     &DBUFF_ITEM_MODIFIERS,
     &DBUFF_LOCATION_MODIFIERS,
     &DBUFF_LOCATION_GROUP_MODIFIERS,
+    &DBUFF_LOCATION_REQUIRED_SKILL_MODIFIERS,
+    &DOGMA_MODIFIER_INFO,
+    &DYNAMIC_ITEM_MAPPINGS,
 ];
 
 /// Get table schema by name

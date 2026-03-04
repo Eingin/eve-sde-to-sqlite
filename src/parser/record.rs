@@ -73,6 +73,22 @@ pub fn parse_junction_records(
             parent_id_column,
             level_key_column,
         } => parse_double_nested(&json, schema, parent_id_column, level_key_column),
+        ArraySource::NestedFanOut {
+            array_field,
+            parent_id_column,
+            key_field,
+            key_column,
+            values_field,
+            value_column,
+        } => parse_nested_fan_out(
+            &json,
+            array_field,
+            parent_id_column,
+            key_field,
+            key_column,
+            values_field,
+            value_column,
+        ),
     }
 }
 
@@ -329,6 +345,54 @@ fn parse_double_nested(
             }
 
             rows.push(ParsedRow { values });
+        }
+    }
+
+    Ok(rows)
+}
+
+/// Parse nested fan-out: {"_key": X, "field": [{"keyField": Y, "valuesField": [Z1, Z2]}, ...]}
+/// Produces one row per integer in the sub-array: (parent=X, key=Y, value=Z)
+fn parse_nested_fan_out(
+    json: &Value,
+    array_field: &str,
+    parent_id_column: &str,
+    key_field: &str,
+    key_column: &str,
+    values_field: &str,
+    value_column: &str,
+) -> Result<Vec<ParsedRow>> {
+    let parent_id = json
+        .get("_key")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("Missing _key in JSON"))?;
+
+    let outer_array = match json.get(array_field) {
+        Some(Value::Array(arr)) => arr,
+        _ => return Ok(vec![]),
+    };
+
+    let mut rows = Vec::new();
+
+    for item in outer_array {
+        let key_value = match item.get(key_field).and_then(|v| v.as_i64()) {
+            Some(k) => k,
+            None => continue,
+        };
+
+        let inner_array = match item.get(values_field) {
+            Some(Value::Array(arr)) => arr,
+            _ => continue,
+        };
+
+        for val in inner_array {
+            if let Some(int_val) = val.as_i64() {
+                let mut values = HashMap::new();
+                values.insert(parent_id_column.to_string(), SqlValue::Integer(parent_id));
+                values.insert(key_column.to_string(), SqlValue::Integer(key_value));
+                values.insert(value_column.to_string(), SqlValue::Integer(int_val));
+                rows.push(ParsedRow { values });
+            }
         }
     }
 
